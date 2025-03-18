@@ -7,6 +7,8 @@ const Home: NextPage = () => {
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [transcript, setTranscript] = useState<string>('');
   const [chatResponse, setChatResponse] = useState<string>('');
+  const [candidateFilePath, setCandidateFilePath] = useState<string>('');
+  const [ttsFilePath, setTtsFilePath] = useState<string>('');
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
 
@@ -22,7 +24,7 @@ const Home: NextPage = () => {
         }
       };
       recorder.onstop = () => {
-        const blob = new Blob(chunksRef.current, { type: 'audio/mp3' });
+        const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
         setAudioBlob(blob);
       };
       recorder.start();
@@ -39,11 +41,11 @@ const Home: NextPage = () => {
     setRecording(false);
   };
 
-  // Send the audio blob to the backend for assessment (transcription, chat response, and TTS)
+  // Send the audio blob to the backend for assessment
   const assessAudio = async () => {
     if (!audioBlob) return;
     const formData = new FormData();
-    formData.append('file', audioBlob, 'audio.mp3');
+    formData.append('file', audioBlob, 'audio.webm');
     try {
       const res = await fetch('/api/assess', {
         method: 'POST',
@@ -53,18 +55,47 @@ const Home: NextPage = () => {
       if (data.transcript) {
         setTranscript(data.transcript);
       } else {
-        console.error('No transcript received:', data.error);
+        console.error('Assessment error:', data.error);
       }
       if (data.chatResponse) {
         setChatResponse(data.chatResponse);
       }
-      if (data.ttsAudio) {
-        // Create an audio element and set its src to the base64 audio data
-        const audio = new Audio(`data:audio/mp3;base64,${data.ttsAudio}`);
-        audio.play();
+      // if (data.ttsAudio) {
+      //   // Create an audio element and set its src to the base64 audio data
+      //   const audio = new Audio(`data:audio/mp3;base64,${data.ttsAudio}`);
+      //   audio.play();
+      // }
+      if (data.candidateFile && data.ttsFile) {
+        setCandidateFilePath(data.candidateFile);
+        setTtsFilePath(data.ttsFile);
       }
     } catch (error) {
       console.error('Error assessing audio:', error);
+    }
+  };
+
+  // Stitch candidate audio and AI response audio together
+  const completeConversation = async () => {
+    if (!candidateFilePath || !ttsFilePath) return;
+    try {
+      const res = await fetch('/api/stitch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          candidateFile: candidateFilePath,
+          ttsFile: ttsFilePath,
+        }),
+      });
+      const data = await res.json();
+      if (data.stitchedAudio) {
+        // Play the stitched audio using an Audio element
+        const audio = new Audio(`data:audio/mp3;base64,${data.stitchedAudio}`);
+        audio.play();
+      } else {
+        console.error('Stitching error:', data.error);
+      }
+    } catch (error) {
+      console.error('Error stitching conversation:', error);
     }
   };
 
@@ -76,6 +107,9 @@ const Home: NextPage = () => {
       </button>
       <button onClick={assessAudio} disabled={!audioBlob}>
         Assess Audio
+      </button>
+      <button onClick={completeConversation} disabled={!candidateFilePath || !ttsFilePath}>
+        Conversation Complete
       </button>
       <h2>Transcript</h2>
       <p style={{ border: '1px solid #ccc', padding: '1rem' }}>{transcript}</p>

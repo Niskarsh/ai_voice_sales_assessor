@@ -1,6 +1,7 @@
 // pages/api/stitch.ts
 import type { NextApiRequest, NextApiResponse } from 'next';
 import ffmpeg from 'fluent-ffmpeg';
+import ffmpegPath from 'ffmpeg-static';
 import fs from 'fs';
 import path from 'path';
 
@@ -29,7 +30,11 @@ export default async function handler(
         }
 
         const uploadDir = path.join(process.cwd(), 'uploads');
-
+        if (ffmpegPath) {
+            ffmpeg.setFfmpegPath(ffmpegPath);
+        } else {
+            throw new Error('ffmpeg-static not found');
+        }
         // Ensure candidate audio is in MP3 format.
         const candidateExt = path.extname(candidateFile).toLowerCase();
         let candidateMp3Path = candidateFile;

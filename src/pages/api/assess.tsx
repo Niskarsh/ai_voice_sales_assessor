@@ -31,6 +31,8 @@ type Data = {
   transcript?: string;
   chatResponse?: string;
   ttsAudio?: string; // base64-encoded audio content
+  candidateFile?: string; // local path for candidate audio file
+  ttsFile?: string; // local path for TTS-generated audio file
   error?: string;
 };
 
@@ -61,22 +63,22 @@ export default async function handler(
       });
     });
 
-    // Access the uploaded file (assuming the field name is "file")
+    // Access the uploaded file (assuming field name is "file")
     const file = files['file'];
     if (!file) {
       return res.status(400).json({ error: 'No file provided' });
     }
     const fileObj = Array.isArray(file) ? file[0] : file;
-    const filePath = fileObj.filepath; // formidable v2+ uses 'filepath'
-    if (!filePath) {
-      return res.status(400).json({ error: 'File path not found' });
+    const candidateFilePath = fileObj.filepath; // formidable v2+ uses 'filepath'
+    if (!candidateFilePath) {
+      return res.status(400).json({ error: 'Candidate file path not found' });
     }
 
     // Step 1: Transcribe the audio using OpenAI's Whisper API
     const transcriptionForm = new FormData();
-    transcriptionForm.append('file', fs.createReadStream(filePath));
+    transcriptionForm.append('file', fs.createReadStream(candidateFilePath));
     transcriptionForm.append('model', 'whisper-1');
-    // Note: We omit the 'language' parameter to let the model auto-detect the language
+    // Omit 'language' to auto-detect
 
     const transcriptionResponse = await axios.post<TranscriptionResponse>(
       'https://api.openai.com/v1/audio/transcriptions',
@@ -89,7 +91,8 @@ export default async function handler(
       }
     );
     const transcript = transcriptionResponse.data.text;
-    console.log('!!!!!!!!!!!!!!!!!!!!!!Transcript:', transcript);
+    console.log('Transcript:', transcript);
+
     // Step 2: Build the prompt and call the Chat Completions API
     const prompt = `You are an AI Sales Assessor. Evaluate the following sales pitch and ask a counter-question to further the conversation:\n\n${transcript}`;
     const chatResponse = await axios.post<ChatResponse>(
@@ -110,41 +113,46 @@ export default async function handler(
       }
     );
     const chatText = chatResponse.data.choices[0].message.content;
-    console.log('@@@@@@@@@@@@@@@@@@@@@@@@Chat', chatText);
+    console.log('Chat response:', chatText);
 
     // Step 3: Convert the chat response text to speech using the TTS endpoint
-    const payload = {
+    const ttsPayload = {
       input: chatText,
-      model: 'tts-1',
-      voice: 'nova',
+      model: 'tts-1', // or 'tts-1-hd'
+      voice: 'nova', // choose from available voices
       response_format: 'mp3',
-      speed: 1.0  // as a number
+      speed: 1.0,
     };
-    
+
     const ttsResponse = await axios.post(
       'https://api.openai.com/v1/audio/speech',
-      payload,
+      ttsPayload,
       {
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
+          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
         },
-        responseType: 'arraybuffer', // if you want to receive binary audio data
+        responseType: 'arraybuffer', // receive binary audio data
       }
     );
-    // console.log(`$$$$$$$$$$$$$$$$$$3Audio length: ${ttsResponse}`);
-    // Convert binary audio data to a base64-encoded string so it can be returned as JSON
-    const audioBase64 = Buffer.from(ttsResponse.data, 'binary').toString('base64');
-    // console.log(`$$$$$$$$$$$$$$$$$$4Audio base64 length: ${audioBase64.length}`);
+    // Save TTS audio to a file in the uploads folder
+    const ttsFileName = `aiResponse-${Date.now()}.mp3`;
+    const ttsFilePath = path.join(uploadDir, ttsFileName);
+    fs.writeFileSync(ttsFilePath, Buffer.from(ttsResponse.data, 'binary'));
 
-    // Return the full result
+    // Also convert TTS audio to base64 (for immediate playback if needed)
+    const ttsAudioBase64 = Buffer.from(ttsResponse.data, 'binary').toString('base64');
+
+    // Return the full result, including file paths for later stitching
     return res.status(200).json({
       transcript,
       chatResponse: chatText,
-      ttsAudio: audioBase64,
+      ttsAudio: ttsAudioBase64,
+      candidateFile: candidateFilePath,
+      ttsFile: ttsFilePath,
     });
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      res.status(500).json({ error: errorMessage });
+    return res.status(500).json({ error: errorMessage });
   }
 }
