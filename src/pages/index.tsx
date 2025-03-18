@@ -2,50 +2,128 @@
 import { useState, useRef } from 'react';
 import type { NextPage } from 'next';
 
+const SILENCE_THRESHOLD = 10; // amplitude threshold (0-255)
+const SILENCE_DURATION = 2000; // milliseconds of silence to trigger segment end
+
 const Home: NextPage = () => {
-  const [recording, setRecording] = useState<boolean>(false);
-  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
+  const [conversationActive, setConversationActive] = useState<boolean>(false);
   const [transcript, setTranscript] = useState<string>('');
   const [chatResponse, setChatResponse] = useState<string>('');
-  const [candidateFilePath, setCandidateFilePath] = useState<string>('');
-  const [ttsFilePath, setTtsFilePath] = useState<string>('');
+  // Arrays to hold the file paths for each segment
+  const [candidateFiles, setCandidateFiles] = useState<string[]>([]);
+  const [ttsFiles, setTtsFiles] = useState<string[]>([]);
+  
+  // Refs for MediaRecorder and AudioContext components
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const chunksRef = useRef<Blob[]>([]);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const audioStreamRef = useRef<MediaStream | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const silenceTimerRef = useRef<number | null>(null);
+  const levelIntervalRef = useRef<number | null>(null);
 
-  // Start recording audio using getUserMedia & MediaRecorder
-  const startRecording = async () => {
+  // Start conversation: get user media, create audio context and start segment recording
+  const startConversation = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const recorder = new MediaRecorder(stream);
-      chunksRef.current = [];
-      recorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          chunksRef.current.push(event.data);
-        }
-      };
-      recorder.onstop = () => {
-        const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
-        setAudioBlob(blob);
-      };
-      recorder.start();
-      mediaRecorderRef.current = recorder;
-      setRecording(true);
+      audioStreamRef.current = stream;
+      // Create AudioContext and Analyser for silence detection
+      const audioContext = new AudioContext();
+      audioContextRef.current = audioContext;
+      const source = audioContext.createMediaStreamSource(stream);
+      const analyser = audioContext.createAnalyser();
+      analyser.fftSize = 2048;
+      source.connect(analyser);
+      analyserRef.current = analyser;
+
+      setConversationActive(true);
+      // Start first segment recording
+      startSegmentRecording();
+      // Start monitoring audio levels for silence detection
+      levelIntervalRef.current = window.setInterval(monitorAudioLevel, 100);
     } catch (error) {
-      console.error('Error accessing microphone:', error);
+      console.error('Error starting conversation:', error);
     }
   };
 
-  // Stop recording
-  const stopRecording = () => {
+  // Stop conversation: stop recording and clear intervals
+  const stopConversation = () => {
+    setConversationActive(false);
     mediaRecorderRef.current?.stop();
-    setRecording(false);
+    if (levelIntervalRef.current) {
+      clearInterval(levelIntervalRef.current);
+      levelIntervalRef.current = null;
+    }
+    if (silenceTimerRef.current) {
+      clearTimeout(silenceTimerRef.current);
+      silenceTimerRef.current = null;
+    }
+    audioStreamRef.current?.getTracks().forEach((track) => track.stop());
+    audioContextRef.current?.close();
   };
 
-  // Send the audio blob to the backend for assessment
-  const assessAudio = async () => {
-    if (!audioBlob) return;
+  // Start a new recording segment
+  const startSegmentRecording = () => {
+    if (!audioStreamRef.current) return;
+    audioChunksRef.current = [];
+    const recorder = new MediaRecorder(audioStreamRef.current);
+    recorder.ondataavailable = (event) => {
+      if (event.data.size > 0) {
+        audioChunksRef.current.push(event.data);
+      }
+    };
+    recorder.onstop = () => {
+      // When the segment stops, process the recorded audio segment
+      const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+      processSegment(blob);
+    };
+    recorder.start();
+    mediaRecorderRef.current = recorder;
+    console.log('Segment recording started');
+  };
+
+  // Monitor the audio level to detect silence
+  const monitorAudioLevel = () => {
+    if (!analyserRef.current) return;
+    const bufferLength = analyserRef.current.fftSize;
+    const dataArray = new Uint8Array(bufferLength);
+    analyserRef.current.getByteTimeDomainData(dataArray);
+  
+    // Calculate RMS (root-mean-square) of deviations from 128
+    let sumSquares = 0;
+    for (let i = 0; i < bufferLength; i++) {
+      const deviation = dataArray[i] - 128;
+      sumSquares += deviation * deviation;
+    }
+    const rms = Math.sqrt(sumSquares / bufferLength);
+  
+    // Log the RMS value for debugging
+    console.log('RMS:', rms);
+  
+    // Adjust this threshold based on testing (try something like 10 or 15)
+    if (rms < SILENCE_THRESHOLD) {
+      if (!silenceTimerRef.current) {
+        silenceTimerRef.current = window.setTimeout(() => {
+          if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+            console.log('Silence detected, stopping segment');
+            mediaRecorderRef.current.stop();
+          }
+          silenceTimerRef.current = null;
+        }, SILENCE_DURATION);
+      }
+    } else {
+      if (silenceTimerRef.current) {
+        clearTimeout(silenceTimerRef.current);
+        silenceTimerRef.current = null;
+      }
+    }
+  };
+  
+
+  // Process a recorded segment: send it to /api/assess
+  const processSegment = async (segmentBlob: Blob) => {
     const formData = new FormData();
-    formData.append('file', audioBlob, 'audio.webm');
+    formData.append('file', segmentBlob, 'segment.webm');
     try {
       const res = await fetch('/api/assess', {
         method: 'POST',
@@ -53,42 +131,53 @@ const Home: NextPage = () => {
       });
       const data = await res.json();
       if (data.transcript) {
-        setTranscript(data.transcript);
-      } else {
-        console.error('Assessment error:', data.error);
+        setTranscript((prev) => prev + '\n' + data.transcript);
       }
       if (data.chatResponse) {
-        setChatResponse(data.chatResponse);
-      }
-            if (data.ttsAudio) {
-        // Create an audio element and set its src to the base64 audio data
-        const audio = new Audio(`data:audio/mp3;base64,${data.ttsAudio}`);
-        audio.play();
+        setChatResponse((prev) => prev + '\n' + data.chatResponse);
       }
       if (data.candidateFile && data.ttsFile) {
-        setCandidateFilePath(data.candidateFile);
-        setTtsFilePath(data.ttsFile);
+        setCandidateFiles((prev) => [...prev, data.candidateFile]);
+        setTtsFiles((prev) => [...prev, data.ttsFile]);
+      }
+      // Play AI's TTS audio response
+      if (data.ttsAudio) {
+        const audio = new Audio(`data:audio/mp3;base64,${data.ttsAudio}`);
+        audio.play();
+        // Wait for the AI response audio to finish playing before starting the next segment.
+        audio.onended = () => {
+          if (conversationActive) {
+            startSegmentRecording();
+          }
+        };
+      } else {
+        // If no TTS audio, immediately start next segment.
+        if (conversationActive) {
+          startSegmentRecording();
+        }
       }
     } catch (error) {
-      console.error('Error assessing audio:', error);
+      console.error('Error processing segment:', error);
+      // Start a new segment even on error.
+      if (conversationActive) {
+        startSegmentRecording();
+      }
     }
   };
 
-  // Stitch candidate audio and AI response audio together
+  // Stitch all segments together (candidate and AI audio)
   const completeConversation = async () => {
-    if (!candidateFilePath || !ttsFilePath) return;
     try {
       const res = await fetch('/api/stitch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          candidateFile: candidateFilePath,
-          ttsFile: ttsFilePath,
+          candidateFiles,
+          ttsFiles,
         }),
       });
       const data = await res.json();
       if (data.stitchedAudio) {
-        // Play the stitched audio using an Audio element
         const audio = new Audio(`data:audio/mp3;base64,${data.stitchedAudio}`);
         audio.play();
       } else {
@@ -103,32 +192,28 @@ const Home: NextPage = () => {
     <div className="container">
       <h1>AI Sales Skill Assessor</h1>
       <div className="button-container">
-        <button onClick={recording ? stopRecording : startRecording}>
-          {recording ? 'Stop Recording' : 'Start Recording'}
-        </button>
-        <button onClick={assessAudio} disabled={!audioBlob}>
-          Assess Audio
-        </button>
-        <button
-          onClick={completeConversation}
-          disabled={!candidateFilePath || !ttsFilePath}
-        >
+        {conversationActive ? (
+          <button onClick={stopConversation}>Stop Conversation</button>
+        ) : (
+          <button onClick={startConversation}>Start Conversation</button>
+        )}
+        <button onClick={completeConversation} disabled={candidateFiles.length === 0 || ttsFiles.length === 0}>
           Conversation Complete
         </button>
       </div>
       <div className="content-container">
         <div className="box">
           <h2>Transcript</h2>
-          <p>{transcript}</p>
+          <pre>{transcript}</pre>
         </div>
         <div className="box">
           <h2>AI Chat Response</h2>
-          <p>{chatResponse}</p>
+          <pre>{chatResponse}</pre>
         </div>
       </div>
       <style jsx>{`
         .container {
-          max-width: 600px;
+          max-width: 700px;
           margin: 2rem auto;
           padding: 2rem;
           background: #f9f9f9;
@@ -143,7 +228,8 @@ const Home: NextPage = () => {
         }
         .button-container {
           display: flex;
-          justify-content: space-around;
+          justify-content: center;
+          gap: 1rem;
           margin-bottom: 2rem;
         }
         button {
@@ -178,10 +264,11 @@ const Home: NextPage = () => {
           margin-bottom: 0.5rem;
           color: #333;
         }
-        p {
-          line-height: 1.6;
-          color: #555;
+        pre {
           white-space: pre-wrap;
+          word-wrap: break-word;
+          color: #555;
+          line-height: 1.6;
         }
       `}</style>
     </div>
