@@ -38,7 +38,7 @@ export default async function handler(
 
   try {
     // Wrap formidable parse in a Promise
-    const { files } = await new Promise<{ files: any }>((resolve, reject) => {
+    const { files } = await new Promise<{ files: { [key: string]: unknown } }>((resolve, reject) => {
       const form = new IncomingForm({
         uploadDir,      // Save files in the 'uploads' folder
         keepExtensions: true, // Keep file extensions
@@ -50,7 +50,7 @@ export default async function handler(
     });
 
     // Access the file; if multiple files are sent, take the first one
-    const file = files.file;
+    const file = files['file'];
     if (!file) {
       return res.status(400).json({ error: 'No file provided' });
     }
@@ -84,8 +84,8 @@ export default async function handler(
     } else {
       return res.status(500).json({ error: 'Transcription failed' });
     }
-  } catch (error: any) {
-    console.error('Transcription API error:', error.response?.data || error.message);
-    return res.status(500).json({ error: error.response?.data || error.message });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      res.status(500).json({ error: errorMessage });
   }
 }
