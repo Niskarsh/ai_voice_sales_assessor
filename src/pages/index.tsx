@@ -60,11 +60,11 @@ const Home: NextPage = () => {
       if (data.chatResponse) {
         setChatResponse(data.chatResponse);
       }
-      // if (data.ttsAudio) {
-      //   // Create an audio element and set its src to the base64 audio data
-      //   const audio = new Audio(`data:audio/mp3;base64,${data.ttsAudio}`);
-      //   audio.play();
-      // }
+            if (data.ttsAudio) {
+        // Create an audio element and set its src to the base64 audio data
+        const audio = new Audio(`data:audio/mp3;base64,${data.ttsAudio}`);
+        audio.play();
+      }
       if (data.candidateFile && data.ttsFile) {
         setCandidateFilePath(data.candidateFile);
         setTtsFilePath(data.ttsFile);
@@ -100,21 +100,90 @@ const Home: NextPage = () => {
   };
 
   return (
-    <div style={{ padding: '2rem' }}>
+    <div className="container">
       <h1>AI Sales Skill Assessor</h1>
-      <button onClick={recording ? stopRecording : startRecording}>
-        {recording ? 'Stop Recording' : 'Start Recording'}
-      </button>
-      <button onClick={assessAudio} disabled={!audioBlob}>
-        Assess Audio
-      </button>
-      <button onClick={completeConversation} disabled={!candidateFilePath || !ttsFilePath}>
-        Conversation Complete
-      </button>
-      <h2>Transcript</h2>
-      <p style={{ border: '1px solid #ccc', padding: '1rem' }}>{transcript}</p>
-      <h2>AI Chat Response</h2>
-      <p style={{ border: '1px solid #ccc', padding: '1rem' }}>{chatResponse}</p>
+      <div className="button-container">
+        <button onClick={recording ? stopRecording : startRecording}>
+          {recording ? 'Stop Recording' : 'Start Recording'}
+        </button>
+        <button onClick={assessAudio} disabled={!audioBlob}>
+          Assess Audio
+        </button>
+        <button
+          onClick={completeConversation}
+          disabled={!candidateFilePath || !ttsFilePath}
+        >
+          Conversation Complete
+        </button>
+      </div>
+      <div className="content-container">
+        <div className="box">
+          <h2>Transcript</h2>
+          <p>{transcript}</p>
+        </div>
+        <div className="box">
+          <h2>AI Chat Response</h2>
+          <p>{chatResponse}</p>
+        </div>
+      </div>
+      <style jsx>{`
+        .container {
+          max-width: 600px;
+          margin: 2rem auto;
+          padding: 2rem;
+          background: #f9f9f9;
+          border-radius: 8px;
+          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+          font-family: Arial, sans-serif;
+        }
+        h1 {
+          text-align: center;
+          margin-bottom: 1.5rem;
+          color: #333;
+        }
+        .button-container {
+          display: flex;
+          justify-content: space-around;
+          margin-bottom: 2rem;
+        }
+        button {
+          padding: 0.75rem 1.25rem;
+          border: none;
+          border-radius: 4px;
+          background-color: #0070f3;
+          color: white;
+          font-size: 1rem;
+          cursor: pointer;
+          transition: background-color 0.3s ease;
+        }
+        button:disabled {
+          background-color: #ccc;
+          cursor: not-allowed;
+        }
+        button:not(:disabled):hover {
+          background-color: #005bb5;
+        }
+        .content-container {
+          display: flex;
+          flex-direction: column;
+          gap: 1.5rem;
+        }
+        .box {
+          background: white;
+          padding: 1rem;
+          border: 1px solid #eaeaea;
+          border-radius: 4px;
+        }
+        h2 {
+          margin-bottom: 0.5rem;
+          color: #333;
+        }
+        p {
+          line-height: 1.6;
+          color: #555;
+          white-space: pre-wrap;
+        }
+      `}</style>
     </div>
   );
 };
