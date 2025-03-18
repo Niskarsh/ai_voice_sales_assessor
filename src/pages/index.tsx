@@ -6,6 +6,7 @@ const Home: NextPage = () => {
   const [recording, setRecording] = useState<boolean>(false);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [transcript, setTranscript] = useState<string>('');
+  const [chatResponse, setChatResponse] = useState<string>('');
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
 
@@ -21,7 +22,7 @@ const Home: NextPage = () => {
         }
       };
       recorder.onstop = () => {
-        const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
+        const blob = new Blob(chunksRef.current, { type: 'audio/mp3' });
         setAudioBlob(blob);
       };
       recorder.start();
@@ -38,13 +39,13 @@ const Home: NextPage = () => {
     setRecording(false);
   };
 
-  // Send the audio blob to the backend for transcription
-  const transcribeAudio = async () => {
+  // Send the audio blob to the backend for assessment (transcription, chat response, and TTS)
+  const assessAudio = async () => {
     if (!audioBlob) return;
     const formData = new FormData();
-    formData.append('file', audioBlob, 'audio.webm');
+    formData.append('file', audioBlob, 'audio.mp3');
     try {
-      const res = await fetch('/api/transcribe', {
+      const res = await fetch('/api/assess', {
         method: 'POST',
         body: formData,
       });
@@ -52,10 +53,18 @@ const Home: NextPage = () => {
       if (data.transcript) {
         setTranscript(data.transcript);
       } else {
-        console.error('Transcription error:', data.error);
+        console.error('No transcript received:', data.error);
+      }
+      if (data.chatResponse) {
+        setChatResponse(data.chatResponse);
+      }
+      if (data.ttsAudio) {
+        // Create an audio element and set its src to the base64 audio data
+        const audio = new Audio(`data:audio/mp3;base64,${data.ttsAudio}`);
+        audio.play();
       }
     } catch (error) {
-      console.error('Error transcribing audio:', error);
+      console.error('Error assessing audio:', error);
     }
   };
 
@@ -65,11 +74,13 @@ const Home: NextPage = () => {
       <button onClick={recording ? stopRecording : startRecording}>
         {recording ? 'Stop Recording' : 'Start Recording'}
       </button>
-      <button onClick={transcribeAudio} disabled={!audioBlob}>
-        Transcribe
+      <button onClick={assessAudio} disabled={!audioBlob}>
+        Assess Audio
       </button>
       <h2>Transcript</h2>
       <p style={{ border: '1px solid #ccc', padding: '1rem' }}>{transcript}</p>
+      <h2>AI Chat Response</h2>
+      <p style={{ border: '1px solid #ccc', padding: '1rem' }}>{chatResponse}</p>
     </div>
   );
 };
