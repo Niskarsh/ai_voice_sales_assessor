@@ -1,6 +1,7 @@
 // pages/index.tsx
 import { useState, useRef } from 'react';
 import type { NextPage } from 'next';
+import axios from 'axios';
 
 interface Message {
   sender: 'user' | 'ai';
@@ -14,7 +15,7 @@ const Home: NextPage = () => {
   const [conversation, setConversation] = useState<Message[]>([]);
   const [candidateFiles, setCandidateFiles] = useState<string[]>([]);
   const [ttsFiles, setTtsFiles] = useState<string[]>([]);
-  
+
   // Track whether we are in the middle of segment recording
   const [listening, setListening] = useState(false);
 
@@ -56,6 +57,7 @@ const Home: NextPage = () => {
 
   // Stop the entire conversation loop
   const stopConversation = () => {
+    analyserRef.current = null;
     recordingRef.current = false;
     mediaRecorderRef.current?.stop();
     setListening(false);
@@ -149,19 +151,37 @@ const Home: NextPage = () => {
       if (transcribeData.candidateFile) {
         setCandidateFiles((prev) => [...prev, transcribeData.candidateFile]);
       }
-      
+
       // Add user transcript
       if (transcribeData.transcript) {
         setConversation((prev) => [...prev, { sender: 'user', text: transcribeData.transcript }]);
       }
 
-    const formData2 = new FormData();
-    formData2.append('transcript', transcribeData.transcript);
-      const res = await fetch('/api/assess', {
-        method: 'POST',
-        body: formData2,
-      });
-      const data = await res.json();
+      // const formData2 = new FormData();
+      // formData2.append('transcript', transcribeData.transcript);
+      // formData2.append('conversation', conversation);
+      // const res = await fetch('/api/assess', {
+      //   method: 'POST',
+      //   body: formData2,
+      // });
+
+
+      const assessPayload = {
+        transcript: transcribeData.transcript,
+        conversation: conversation,
+      };
+  
+      const res = await axios.post(
+        '/api/assess',
+        assessPayload,
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+          },
+        }
+      );
+      const data = await res.data;
 
       // Add AI response
       if (data.chatResponse) {

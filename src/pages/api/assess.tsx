@@ -1,13 +1,12 @@
 // pages/api/assess.ts
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { IncomingForm } from 'formidable';
 import fs from 'fs';
 import path from 'path';
 import axios from 'axios';
 
 export const config = {
   api: {
-    bodyParser: false, // Disable Next.js built-in parser for multipart/form-data
+    bodyParser: true, // Disable Next.js built-in parser for multipart/form-data
   },
 };
 
@@ -44,26 +43,15 @@ export default async function handler(
   if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir, { recursive: true });
   }
-
+  
   try {
     // Parse the multipart form data using formidable (wrapped in a Promise)
-    const { fields } = await new Promise<{ fields: { [key: string]: unknown } }>((resolve, reject) => {
-      const form = new IncomingForm({
-        uploadDir,      // Save files in the 'uploads' folder
-        keepExtensions: true, // Keep file extensions
-      });
-      form.parse(req, (err, fields) => {
-        if (err) return reject(err);
-        resolve({ fields });
-      });
-    });
-
-    // Access the uploaded file (assuming field name is "file")
-    const transcript = fields['transcript'];
+    const { transcript } = req.body;
     if (!transcript) {
-      return res.status(400).json({ error: 'No file provided' });
+      return res.status(400).json({ error: 'No transcript provided' });
     }
     
+    console.log('Request body:', req.body);
     console.log('Transcript:', transcript);
 
     // Step 2: Build the prompt and call the Chat Completions API

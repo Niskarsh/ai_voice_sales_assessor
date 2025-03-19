@@ -80,7 +80,7 @@ export default async function handler(
       }
     );
     const transcript = transcriptionResponse.data.text;
-    console.log('Transcript:', transcript);
+    // console.log('Transcript:', transcript);
 
     // Return the full result, including file paths for later stitching
     return res.status(200).json({
