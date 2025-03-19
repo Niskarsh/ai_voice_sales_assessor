@@ -46,24 +46,31 @@ export default async function handler(
   
   try {
     // Parse the multipart form data using formidable (wrapped in a Promise)
-    const { transcript } = req.body;
+    const { transcript, conversation } = req.body;
     if (!transcript) {
       return res.status(400).json({ error: 'No transcript provided' });
     }
     
     console.log('Request body:', req.body);
-    console.log('Transcript:', transcript);
+    // console.log('Transcript:', transcript);
 
     // Step 2: Build the prompt and call the Chat Completions API
-    const prompt = `You are an AI Sales Assessor. Evaluate the following sales pitch and ask a counter-question to further the conversation:\n\n${transcript}`;
+    // const prompt = `You are an AI Sales Assessor. Evaluate the following sales pitch and ask a counter-question to further the conversation:\n\n${transcript}`;
+
+    const messages = [
+      { role: 'system', content: 'You are to act as a doubtful consumer who is looking to buy a vaccum cleaner. The user will try to convince you to buy the vaccum cleaner, you are supposed to be on the fence cross questioning the user until the user convinces you to buy the vaccum cleaner. Once you are convinced, let the user know in response.' },
+      ...(conversation.map((conversationItem: { sender: 'user' | 'ai'; text: string }) => ({
+        role: conversationItem.sender === 'user' ? 'user' : 'assistant',
+        content: conversationItem.text,
+      }))),
+      { role: 'user', content: transcript },
+    ];
+    console.log('$%%%%%%%%%%%^^^^^^^^^^^^^^^^^^^^Chat messages:', messages);
     const chatResponse = await axios.post<ChatResponse>(
       'https://api.openai.com/v1/chat/completions',
       {
         model: 'gpt-4o-mini',
-        messages: [
-          { role: 'system', content: 'You are a helpful and critical sales assessor.' },
-          { role: 'user', content: prompt },
-        ],
+        messages,
         temperature: 0.7,
       },
       {
@@ -74,7 +81,7 @@ export default async function handler(
       }
     );
     const chatText = chatResponse.data.choices[0].message.content;
-    console.log('Chat response:', chatText);
+    // console.log('Chat response:', chatText);
 
     // Step 3: Convert the chat response text to speech using the TTS endpoint
     const ttsPayload = {

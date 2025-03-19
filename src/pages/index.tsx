@@ -19,6 +19,7 @@ const Home: NextPage = () => {
   // Track whether we are in the middle of segment recording
   const [listening, setListening] = useState(false);
 
+  const conversationRef = useRef<Message[]>([]);
   const recordingRef = useRef<boolean>(false);
   const conversationStartedRef = useRef<boolean>(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -154,7 +155,10 @@ const Home: NextPage = () => {
 
       // Add user transcript
       if (transcribeData.transcript) {
-        setConversation((prev) => [...prev, { sender: 'user', text: transcribeData.transcript }]);
+        setConversation((prev) => {
+          conversationRef.current = [...prev, { sender: 'user', text: transcribeData.transcript }];
+          return [...prev, { sender: 'user', text: transcribeData.transcript }];
+        });
       }
 
       // const formData2 = new FormData();
@@ -168,7 +172,7 @@ const Home: NextPage = () => {
 
       const assessPayload = {
         transcript: transcribeData.transcript,
-        conversation: conversation,
+        conversation: conversationRef.current,
       };
   
       const res = await axios.post(
@@ -185,7 +189,10 @@ const Home: NextPage = () => {
 
       // Add AI response
       if (data.chatResponse) {
-        setConversation((prev) => [...prev, { sender: 'ai', text: data.chatResponse }]);
+        setConversation((prev) => {
+          conversationRef.current = [...prev, { sender: 'ai', text: data.chatResponse }];
+          return [...prev, { sender: 'ai', text: data.chatResponse }];
+        });
       }
 
       // Save file references
