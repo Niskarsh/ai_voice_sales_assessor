@@ -1,3 +1,4 @@
+// pages/api/stitch.ts
 import type { NextApiRequest, NextApiResponse } from 'next';
 import ffmpeg from 'fluent-ffmpeg';
 import ffmpegPath from 'ffmpeg-static';
@@ -40,11 +41,33 @@ export default async function handler(
       throw new Error('ffmpeg-static not found');
     }
 
+    // Convert all candidate files to MP3 if needed.
+    const candidateMp3Files: string[] = [];
+    for (const candidateFile of candidateFiles) {
+      const ext = path.extname(candidateFile).toLowerCase();
+      if (ext !== '.mp3') {
+        const candidateMp3Path = path.join(uploadDir, `candidate-${Date.now()}.mp3`);
+        await new Promise<void>((resolve, reject) => {
+          ffmpeg(candidateFile)
+            .toFormat('mp3')
+            .on('end', () => {
+              console.log(`Candidate conversion complete: ${candidateMp3Path}`);
+              resolve();
+            })
+            .on('error', (err: Error) => reject(err))
+            .save(candidateMp3Path);
+        });
+        candidateMp3Files.push(candidateMp3Path);
+      } else {
+        candidateMp3Files.push(candidateFile);
+      }
+    }
+
     // Build a concat list file for the demuxer.
-    // Here we assume candidateFiles and ttsFiles are already in order.
     let concatListContent = '';
-    for (let i = 0; i < candidateFiles.length; i++) {
-      concatListContent += `file '${candidateFiles[i]}'\n`;
+    // Stitch them in alternating order: candidate, then corresponding TTS.
+    for (let i = 0; i < candidateMp3Files.length; i++) {
+      concatListContent += `file '${candidateMp3Files[i]}'\n`;
       if (ttsFiles[i]) {
         concatListContent += `file '${ttsFiles[i]}'\n`;
       }
@@ -55,6 +78,7 @@ export default async function handler(
     // Define the output stitched file path.
     const stitchedPath = path.join(uploadDir, `stitched-${Date.now()}.mp3`);
 
+    // Use ffmpeg's concat demuxer to stitch files together asynchronously.
     await new Promise<void>((resolve, reject) => {
       ffmpeg()
         .input(concatListPath)
@@ -71,9 +95,11 @@ export default async function handler(
         .save(stitchedPath);
     });
 
+    // Read and encode stitched audio.
     const stitchedBuffer = fs.readFileSync(stitchedPath);
     const stitchedBase64 = stitchedBuffer.toString('base64');
 
+    // Cleanup: remove temporary file list.
     fs.unlinkSync(concatListPath);
 
     return res.status(200).json({ stitchedAudio: stitchedBase64 });
