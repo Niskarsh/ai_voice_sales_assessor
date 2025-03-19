@@ -1,4 +1,4 @@
-// pages/api/transcribe.ts
+// pages/api/assess.ts
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { IncomingForm } from 'formidable';
 import fs from 'fs';
@@ -18,6 +18,10 @@ interface TranscriptionResponse {
 
 type Data = {
   transcript?: string;
+  chatResponse?: string;
+  ttsAudio?: string; // base64-encoded audio content
+  candidateFile?: string; // local path for candidate audio file
+  ttsFile?: string; // local path for TTS-generated audio file
   error?: string;
 };
 
@@ -31,13 +35,12 @@ export default async function handler(
 
   // Define a local upload directory
   const uploadDir = path.join(process.cwd(), 'uploads');
-  // Ensure the upload directory exists
   if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir, { recursive: true });
   }
 
   try {
-    // Wrap formidable parse in a Promise
+    // Parse the multipart form data using formidable (wrapped in a Promise)
     const { files } = await new Promise<{ files: { [key: string]: unknown } }>((resolve, reject) => {
       const form = new IncomingForm({
         uploadDir,      // Save files in the 'uploads' folder
@@ -49,43 +52,43 @@ export default async function handler(
       });
     });
 
-    // Access the file; if multiple files are sent, take the first one
+    // Access the uploaded file (assuming field name is "file")
     const file = files['file'];
     if (!file) {
       return res.status(400).json({ error: 'No file provided' });
     }
     const fileObj = Array.isArray(file) ? file[0] : file;
-    const filePath = fileObj.filepath; // formidable v2+ uses 'filepath'
-    if (!filePath) {
-      return res.status(400).json({ error: 'File path not found' });
+    const candidateFilePath = fileObj.filepath; // formidable v2+ uses 'filepath'
+    if (!candidateFilePath) {
+      return res.status(400).json({ error: 'Candidate file path not found' });
     }
 
-    // Prepare form-data for the OpenAI transcription API
-    const openaiForm = new FormData();
-    openaiForm.append('file', fs.createReadStream(filePath));
-    openaiForm.append('model', 'whisper-1'); // required parameter
-    // openaiForm.append('language', 'en');
+    // Step 1: Transcribe the audio using OpenAI's Whisper API
+    const transcriptionForm = new FormData();
+    transcriptionForm.append('file', fs.createReadStream(candidateFilePath));
+    transcriptionForm.append('model', 'whisper-1');
+    // Omit 'language' to auto-detect
 
-    // Send the request using Axios
-    const openaiResponse = await axios.post<TranscriptionResponse>(
+    const transcriptionResponse = await axios.post<TranscriptionResponse>(
       'https://api.openai.com/v1/audio/transcriptions',
-      openaiForm,
+      transcriptionForm,
       {
         headers: {
           Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-          ...openaiForm.getHeaders(),
+          ...transcriptionForm.getHeaders(),
         },
       }
     );
+    const transcript = transcriptionResponse.data.text;
+    console.log('Transcript:', transcript);
 
-    if (openaiResponse.data && openaiResponse.data.text) {
-      console.log(openaiResponse.data)
-      return res.status(200).json({ transcript: openaiResponse.data.text });
-    } else {
-      return res.status(500).json({ error: 'Transcription failed' });
-    }
+    // Return the full result, including file paths for later stitching
+    return res.status(200).json({
+      transcript,
+      candidateFile: candidateFilePath,
+    });
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      res.status(500).json({ error: errorMessage });
+    return res.status(500).json({ error: errorMessage });
   }
 }
