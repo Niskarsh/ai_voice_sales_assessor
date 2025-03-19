@@ -3,10 +3,11 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import fs from 'fs';
 import path from 'path';
 import axios from 'axios';
+import { AI_CONTEXT } from '@/constants';
 
 export const config = {
   api: {
-    bodyParser: true, // Disable Next.js built-in parser for multipart/form-data
+    bodyParser: true, // JSON payload
   },
 };
 
@@ -22,10 +23,8 @@ interface ChatResponse {
 }
 
 type Data = {
-  transcript?: string;
   chatResponse?: string;
   ttsAudio?: string; // base64-encoded audio content
-  candidateFile?: string; // local path for candidate audio file
   ttsFile?: string; // local path for TTS-generated audio file
   error?: string;
 };
@@ -38,34 +37,36 @@ export default async function handler(
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  // Define a local upload directory
   const uploadDir = path.join(process.cwd(), 'uploads');
   if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir, { recursive: true });
   }
   
   try {
-    // Parse the multipart form data using formidable (wrapped in a Promise)
     const { transcript, conversation } = req.body;
     if (!transcript) {
       return res.status(400).json({ error: 'No transcript provided' });
     }
-    
-    console.log('Request body:', req.body);
-    // console.log('Transcript:', transcript);
 
-    // Step 2: Build the prompt and call the Chat Completions API
-    // const prompt = `You are an AI Sales Assessor. Evaluate the following sales pitch and ask a counter-question to further the conversation:\n\n${transcript}`;
+    // Remove conversation entries where text is empty or 'Processing your message...' or 'AI is typing...
+    let sanitzedConversation = [];
+    if (Array.isArray(conversation)) {
+      sanitzedConversation = conversation.filter(
+        (conversationItem: { sender: 'user' | 'ai'; text: string }) =>
+          conversationItem.text && !['Processing your message...', 'AI is typing...'].includes(conversationItem.text)
+      );
+    }
 
+    // Build chat messages using conversation history (from ref payload)
     const messages = [
-      { role: 'system', content: 'You are to act as a doubtful consumer who is looking to buy a vaccum cleaner. The user will try to convince you to buy the vaccum cleaner, you are supposed to be on the fence cross questioning the user until the user convinces you to buy the vaccum cleaner. Once you are convinced, let the user know in response.' },
-      ...(conversation.map((conversationItem: { sender: 'user' | 'ai'; text: string }) => ({
+      { role: 'system', content: AI_CONTEXT },
+      ...(sanitzedConversation.map((conversationItem: { sender: 'user' | 'ai'; text: string }) => ({
         role: conversationItem.sender === 'user' ? 'user' : 'assistant',
         content: conversationItem.text,
       }))),
-      { role: 'user', content: transcript },
+      // { role: 'user', content: transcript },
     ];
-    console.log('$%%%%%%%%%%%^^^^^^^^^^^^^^^^^^^^Chat messages:', messages);
+    console.log('Chat messages:', messages);
     const chatResponse = await axios.post<ChatResponse>(
       'https://api.openai.com/v1/chat/completions',
       {
@@ -81,13 +82,12 @@ export default async function handler(
       }
     );
     const chatText = chatResponse.data.choices[0].message.content;
-    // console.log('Chat response:', chatText);
 
-    // Step 3: Convert the chat response text to speech using the TTS endpoint
+    // Call TTS endpoint to generate AI response audio
     const ttsPayload = {
       input: chatText,
-      model: 'tts-1', // or 'tts-1-hd'
-      voice: 'nova', // choose from available voices
+      model: 'tts-1',
+      voice: 'nova',
       response_format: 'mp3',
       speed: 1.0,
     };
@@ -100,18 +100,14 @@ export default async function handler(
           'Content-Type': 'application/json',
           Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
         },
-        responseType: 'arraybuffer', // receive binary audio data
+        responseType: 'arraybuffer',
       }
     );
-    // Save TTS audio to a file in the uploads folder
     const ttsFileName = `aiResponse-${Date.now()}.mp3`;
     const ttsFilePath = path.join(uploadDir, ttsFileName);
     fs.writeFileSync(ttsFilePath, Buffer.from(ttsResponse.data, 'binary'));
-
-    // Also convert TTS audio to base64 (for immediate playback if needed)
     const ttsAudioBase64 = Buffer.from(ttsResponse.data, 'binary').toString('base64');
 
-    // Return the full result, including file paths for later stitching
     return res.status(200).json({
       chatResponse: chatText,
       ttsAudio: ttsAudioBase64,

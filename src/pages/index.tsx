@@ -1,5 +1,5 @@
 // pages/index.tsx
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import type { NextPage } from 'next';
 import axios from 'axios';
 
@@ -11,15 +11,50 @@ interface Message {
 const SILENCE_THRESHOLD = 10; // adjust as needed
 const SILENCE_DURATION = 2000; // in ms
 
+// TypingIndicator component showing 3 animated dots, accepts a color prop
+const TypingIndicator = ({ color = "#ccc" }: { color?: string }) => (
+  <div className="typing-indicator">
+    <span className="dot"></span>
+    <span className="dot"></span>
+    <span className="dot"></span>
+    <style jsx>{`
+      .typing-indicator {
+        display: flex;
+        gap: 7px;
+      }
+      .dot {
+        width: 6px;
+        height: 6px;
+        background: ${color};
+        border-radius: 50%;
+        animation: blink 1.4s infinite both;
+      }
+      .dot:nth-child(1) {
+        animation-delay: 0s;
+      }
+      .dot:nth-child(2) {
+        animation-delay: 0.2s;
+      }
+      .dot:nth-child(3) {
+        animation-delay: 0.4s;
+      }
+      @keyframes blink {
+        0% { opacity: 0.2; }
+        20% { opacity: 1; }
+        100% { opacity: 0.2; }
+      }
+    `}</style>
+  </div>
+);
+
 const Home: NextPage = () => {
   const [conversation, setConversation] = useState<Message[]>([]);
+  // Use a ref to always have the latest conversation (for payload building)
+  const conversationRef = useRef<Message[]>([]);
   const [candidateFiles, setCandidateFiles] = useState<string[]>([]);
   const [ttsFiles, setTtsFiles] = useState<string[]>([]);
-
-  // Track whether we are in the middle of segment recording
   const [listening, setListening] = useState(false);
 
-  const conversationRef = useRef<Message[]>([]);
   const recordingRef = useRef<boolean>(false);
   const conversationStartedRef = useRef<boolean>(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -30,22 +65,49 @@ const Home: NextPage = () => {
   const silenceTimerRef = useRef<number | null>(null);
   const levelIntervalRef = useRef<number | null>(null);
 
-  // Start the entire conversation loop
+  // Refs to store placeholder indices
+  const lastUserPlaceholderIndexRef = useRef<number | null>(null);
+  const lastAiPlaceholderIndexRef = useRef<number | null>(null);
+
+  // Ref for chat container element for auto-scroll
+  const chatContainerRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll effect: scroll to bottom when conversation updates
+  useEffect(() => {
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+    }
+  }, [conversation]);
+
+  // Helper: update entire conversation (state & ref)
+  const updateConversation = (newConversation: Message[]) => {
+    setConversation(newConversation);
+    conversationRef.current = newConversation;
+  };
+
+  // Helper: update a specific message by index
+  const updateConversationMessage = (index: number, newText: string) => {
+    if (index < 0 || index >= conversationRef.current.length) return;
+    const updated = [...conversationRef.current];
+    updated[index] = { ...updated[index], text: newText };
+    conversationRef.current = updated;
+    setConversation(updated);
+  };
+
+  // Start continuous conversation
   const startConversation = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       audioStreamRef.current = stream;
-
       const audioContext = new AudioContext();
       audioContextRef.current = audioContext;
-
       const source = audioContext.createMediaStreamSource(stream);
       const analyser = audioContext.createAnalyser();
       analyser.fftSize = 2048;
       source.connect(analyser);
       analyserRef.current = analyser;
 
-      setConversation([]); // reset conversation
+      updateConversation([]); // reset conversation
       setCandidateFiles([]);
       setTtsFiles([]);
       recordingRef.current = true;
@@ -56,13 +118,11 @@ const Home: NextPage = () => {
     }
   };
 
-  // Stop the entire conversation loop
+  // Stop conversation loop
   const stopConversation = () => {
-    analyserRef.current = null;
     recordingRef.current = false;
     mediaRecorderRef.current?.stop();
     setListening(false);
-
     if (levelIntervalRef.current) {
       clearInterval(levelIntervalRef.current);
       levelIntervalRef.current = null;
@@ -79,7 +139,6 @@ const Home: NextPage = () => {
   const startSegmentRecording = () => {
     if (!audioStreamRef.current) return;
     audioChunksRef.current = [];
-
     const recorder = new MediaRecorder(audioStreamRef.current);
     recorder.ondataavailable = (event) => {
       if (event.data.size > 0) {
@@ -91,34 +150,27 @@ const Home: NextPage = () => {
       const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
       processSegment(blob);
     };
-
     recorder.start();
     mediaRecorderRef.current = recorder;
     setListening(true);
     console.log('Segment recording started');
   };
 
-  // Monitor audio to detect silence
+  // Monitor audio level (RMS) to detect silence
   const monitorAudioLevel = () => {
     if (!analyserRef.current) return;
-
     const bufferLength = analyserRef.current.fftSize;
     const dataArray = new Uint8Array(bufferLength);
     analyserRef.current.getByteTimeDomainData(dataArray);
-
     let sumSquares = 0;
     for (let i = 0; i < bufferLength; i++) {
       const deviation = dataArray[i] - 128;
       sumSquares += deviation * deviation;
     }
     const rms = Math.sqrt(sumSquares / bufferLength);
-
-    // If the audio level is high and conversation not started
     if (rms > SILENCE_THRESHOLD && !conversationStartedRef.current) {
       conversationStartedRef.current = true;
     }
-
-    // If audio level is low (silence) and the conversation is active, start a silence timer
     if (rms < SILENCE_THRESHOLD && conversationStartedRef.current) {
       if (!silenceTimerRef.current) {
         silenceTimerRef.current = window.setTimeout(() => {
@@ -140,89 +192,72 @@ const Home: NextPage = () => {
 
   // Process a recorded segment
   const processSegment = async (segmentBlob: Blob) => {
+    // Insert user placeholder before sending to transcribe endpoint
+    const userPlaceholderIndex = conversationRef.current.length;
+    updateConversation([
+      ...conversationRef.current,
+      { sender: 'user', text: 'Processing your message...' },
+    ]);
+    lastUserPlaceholderIndexRef.current = userPlaceholderIndex;
+
     const formData = new FormData();
     formData.append('file', segmentBlob, 'segment.webm');
+
     try {
+      // Call transcribe endpoint
       const transcribeRes = await fetch('/api/transcribe', {
         method: 'POST',
         body: formData,
       });
       const transcribeData = await transcribeRes.json();
-      // Save file references
       if (transcribeData.candidateFile) {
         setCandidateFiles((prev) => [...prev, transcribeData.candidateFile]);
       }
-
-      // Add user transcript
-      if (transcribeData.transcript) {
-        setConversation((prev) => {
-          conversationRef.current = [...prev, { sender: 'user', text: transcribeData.transcript }];
-          return [...prev, { sender: 'user', text: transcribeData.transcript }];
-        });
+      // Replace user placeholder with actual transcript
+      if (transcribeData.transcript && lastUserPlaceholderIndexRef.current !== null) {
+        updateConversationMessage(lastUserPlaceholderIndexRef.current, transcribeData.transcript);
+        lastUserPlaceholderIndexRef.current = null;
       }
-
-      // const formData2 = new FormData();
-      // formData2.append('transcript', transcribeData.transcript);
-      // formData2.append('conversation', conversation);
-      // const res = await fetch('/api/assess', {
-      //   method: 'POST',
-      //   body: formData2,
-      // });
-
+      // Insert AI placeholder for chat response
+      const aiPlaceholderIndex = conversationRef.current.length;
+      updateConversation([
+        ...conversationRef.current,
+        { sender: 'ai', text: 'AI is typing...' },
+      ]);
+      lastAiPlaceholderIndexRef.current = aiPlaceholderIndex;
 
       const assessPayload = {
         transcript: transcribeData.transcript,
         conversation: conversationRef.current,
       };
-  
-      const res = await axios.post(
-        '/api/assess',
-        assessPayload,
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-          },
-        }
-      );
-      const data = await res.data;
-
-      // Add AI response
-      if (data.chatResponse) {
-        setConversation((prev) => {
-          conversationRef.current = [...prev, { sender: 'ai', text: data.chatResponse }];
-          return [...prev, { sender: 'ai', text: data.chatResponse }];
-        });
+      const assessRes = await axios.post('/api/assess', assessPayload, {
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const assessData = assessRes.data;
+      if (assessData.chatResponse && lastAiPlaceholderIndexRef.current !== null) {
+        updateConversationMessage(lastAiPlaceholderIndexRef.current, assessData.chatResponse);
+        lastAiPlaceholderIndexRef.current = null;
       }
-
-      // Save file references
-      if (data.ttsFile) {
-        setTtsFiles((prev) => [...prev, data.ttsFile]);
+      if (assessData.ttsFile) {
+        setTtsFiles((prev) => [...prev, assessData.ttsFile]);
       }
-
-      // Play AI's TTS audio, then start new segment
-      if (data.ttsAudio) {
-        const audio = new Audio(`data:audio/mp3;base64,${data.ttsAudio}`);
+      // Play TTS audio and then start new segment when finished
+      if (assessData.ttsAudio) {
+        const audio = new Audio(`data:audio/mp3;base64,${assessData.ttsAudio}`);
         audio.play();
         audio.onended = () => {
-          if (recordingRef.current) {
-            startSegmentRecording();
-          }
+          if (recordingRef.current) startSegmentRecording();
         };
       } else {
-        if (recordingRef.current) {
-          startSegmentRecording();
-        }
+        if (recordingRef.current) startSegmentRecording();
       }
     } catch (error) {
       console.error('Error processing segment:', error);
-      if (recordingRef.current) {
-        startSegmentRecording();
-      }
+      if (recordingRef.current) startSegmentRecording();
     }
   };
 
-  // Stitch all segments
+  // Stitch conversation segments together
   const completeConversation = async () => {
     try {
       const res = await fetch('/api/stitch', {
@@ -277,23 +312,31 @@ const Home: NextPage = () => {
           </div>
         )}
       </div>
-
       <div className="right-panel">
-        <div className="chat-container">
+        <div className="chat-container" ref={chatContainerRef}>
           {conversation.map((msg, idx) => (
             <div key={idx} className={`chat-bubble ${msg.sender}`}>
-              <span className="sender">{msg.sender === 'user' ? 'You' : 'AI'}</span>
-              <p className="message">{msg.text}</p>
+              <span className="sender">
+                {msg.sender === 'user' ? 'You' : 'Customer'}
+              </span>
+              <div className="message">
+                {msg.sender === 'ai' && msg.text === 'AI is typing...' ? (
+                  <TypingIndicator color="#FFA500" />
+                ) : msg.sender === 'user' && msg.text === 'Processing your message...' ? (
+                  <TypingIndicator color="#FFD700" />
+                ) : (
+                  msg.text
+                )}
+              </div>
             </div>
           ))}
         </div>
       </div>
-
       <style jsx>{`
         .main-container {
           display: flex;
           height: 100vh;
-          background-color: #111;
+          background-color: #000;
           color: #fff;
           font-family: Arial, sans-serif;
         }
@@ -302,13 +345,14 @@ const Home: NextPage = () => {
           padding: 2rem;
           display: flex;
           flex-direction: column;
-          align-items: flex-start;
-          background-color: #1f1f1f;
-          box-shadow: 2px 0 5px rgba(0,0,0,0.2);
+          align-items: center;
+          background-color: #222;
+          box-shadow: 2px 0 5px rgba(255, 255, 255, 0.1);
         }
         .left-panel h1 {
           margin-bottom: 2rem;
           font-size: 1.5rem;
+          color: #FFD700;
         }
         .controls {
           display: flex;
@@ -327,18 +371,18 @@ const Home: NextPage = () => {
           text-align: center;
         }
         .mic-button {
-          background-color: #0070f3;
-          color: #fff;
+          background-color: #FFD700;
+          color: #000;
         }
         .mic-button:hover:not(:disabled) {
-          background-color: #005bb5;
+          background-color: #e6c200;
         }
         .conv-complete {
-          background-color: #28a745;
-          color: #fff;
+          background-color: #FFA500;
+          color: #000;
         }
         .conv-complete:hover:not(:disabled) {
-          background-color: #218838;
+          background-color: #e69500;
         }
         .mic-button:disabled, .conv-complete:disabled {
           background-color: #555;
@@ -355,7 +399,7 @@ const Home: NextPage = () => {
         }
         .wave {
           width: 4px;
-          background: #0070f3;
+          background: #FFD700;
           margin: 0 2px;
           animation: wave 1s infinite;
           border-radius: 2px;
@@ -375,44 +419,51 @@ const Home: NextPage = () => {
           display: flex;
           flex-direction: column;
           padding: 2rem;
+          background-color: #FFF;
+          color: #000;
         }
         .chat-container {
           display: flex;
           flex-direction: column;
           gap: 1rem;
           flex: 1;
-          background: #f9f9f9;
+          background: #FFF;
           border-radius: 8px;
           padding: 1rem;
           overflow-y: auto;
-          color: #000;
         }
         .chat-bubble {
           max-width: 80%;
           padding: 0.75rem 1rem;
           border-radius: 16px;
-          position: relative;
           word-wrap: break-word;
           font-size: 1rem;
         }
         .chat-bubble.user {
-          background-color: #60b05b;
+          background-color: #222;
           align-self: flex-end;
-          color: #fff;
+          color: #FFD700;
         }
         .chat-bubble.ai {
-          background-color: #c58611;
+          background-color: #333;
           align-self: flex-start;
-          color: #fff;
+          color: #FFA500;
         }
-        .sender {
-          font-weight: bold;
+        .chat-bubble.user .sender {
+          text-align: right;
+          display: block;
+          margin-bottom: 0.25rem;
+          font-size: 0.85rem;
+        }
+        .chat-bubble.ai .sender {
+          text-align: left;
           display: block;
           margin-bottom: 0.25rem;
           font-size: 0.85rem;
         }
         .message {
-          margin: 0;
+          margin-top: 10px;
+          margin-bottom: 10px;
           line-height: 1.4;
           white-space: pre-wrap;
         }

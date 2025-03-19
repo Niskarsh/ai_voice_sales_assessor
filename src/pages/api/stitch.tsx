@@ -24,9 +24,14 @@ export default async function handler(
     return res.status(405).json({ error: 'Method not allowed' });
   }
   try {
-    const { candidateFile, ttsFile } = req.body;
-    if (!candidateFile || !ttsFile) {
-      return res.status(400).json({ error: 'Missing file paths' });
+    const { candidateFiles, ttsFiles } = req.body;
+    if (
+      !candidateFiles ||
+      !ttsFiles ||
+      !Array.isArray(candidateFiles) ||
+      !Array.isArray(ttsFiles)
+    ) {
+      return res.status(400).json({ error: 'Missing or invalid file paths' });
     }
 
     const uploadDir = path.join(process.cwd(), 'uploads');
@@ -36,33 +41,49 @@ export default async function handler(
       throw new Error('ffmpeg-static not found');
     }
 
-    // Ensure candidate audio is in MP3 format.
-    const candidateExt = path.extname(candidateFile).toLowerCase();
-    let candidateMp3Path = candidateFile;
-    if (candidateExt !== '.mp3') {
-      candidateMp3Path = path.join(uploadDir, `candidate-${Date.now()}.mp3`);
-      await new Promise<void>((resolve, reject) => {
-        ffmpeg(candidateFile)
-          .toFormat('mp3')
-          .on('end', () => {
-            console.log('Candidate conversion complete');
-            resolve();
-          })
-          .on('error', (err: Error) => reject(err))
-          .save(candidateMp3Path);
-      });
+    // Convert all candidate files to MP3 if needed.
+    const candidateMp3Files: string[] = [];
+    for (const candidateFile of candidateFiles) {
+      const ext = path.extname(candidateFile).toLowerCase();
+      if (ext !== '.mp3') {
+        const candidateMp3Path = path.join(uploadDir, `candidate-${Date.now()}.mp3`);
+        await new Promise<void>((resolve, reject) => {
+          ffmpeg(candidateFile)
+            .toFormat('mp3')
+            .on('end', () => {
+              console.log(`Candidate conversion complete: ${candidateMp3Path}`);
+              resolve();
+            })
+            .on('error', (err: Error) => reject(err))
+            .save(candidateMp3Path);
+        });
+        candidateMp3Files.push(candidateMp3Path);
+      } else {
+        candidateMp3Files.push(candidateFile);
+      }
     }
+
+    // Build a concat list file for the demuxer.
+    let concatListContent = '';
+    // Stitch them in alternating order: candidate, then corresponding TTS.
+    for (let i = 0; i < candidateMp3Files.length; i++) {
+      concatListContent += `file '${candidateMp3Files[i]}'\n`;
+      if (ttsFiles[i]) {
+        concatListContent += `file '${ttsFiles[i]}'\n`;
+      }
+    }
+    const concatListPath = path.join(uploadDir, `concat-${Date.now()}.txt`);
+    fs.writeFileSync(concatListPath, concatListContent);
 
     // Define the output stitched file path.
     const stitchedPath = path.join(uploadDir, `stitched-${Date.now()}.mp3`);
 
-    // Use ffmpeg's concat filter to re-encode and stitch the two audio files.
+    // Use ffmpeg's concat demuxer to stitch files together asynchronously.
     await new Promise<void>((resolve, reject) => {
       ffmpeg()
-        .input(candidateMp3Path)
-        .input(ttsFile)
-        .complexFilter(['[0:a][1:a]concat=n=2:v=0:a=1[outa]'])
-        .outputOptions(['-map', '[outa]', '-acodec', 'libmp3lame'])
+        .input(concatListPath)
+        .inputOptions(['-f', 'concat', '-safe', '0'])
+        .outputOptions(['-c:a', 'libmp3lame'])
         .on('end', () => {
           console.log('Concatenation complete');
           resolve();
@@ -74,18 +95,16 @@ export default async function handler(
         .save(stitchedPath);
     });
 
-    // Read the stitched file and encode it in base64.
+    // Read and encode stitched audio.
     const stitchedBuffer = fs.readFileSync(stitchedPath);
     const stitchedBase64 = stitchedBuffer.toString('base64');
 
-    // Cleanup: Optionally remove intermediate files if desired.
-    // fs.unlinkSync(candidateMp3Path); // if candidateMp3Path was a conversion result
-    // fs.unlinkSync(ttsFile); // if you want to remove the TTS file too
+    // Cleanup: remove temporary file list.
+    fs.unlinkSync(concatListPath);
 
     return res.status(200).json({ stitchedAudio: stitchedBase64 });
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    console.error('Stitching error:', errorMessage);
     return res.status(500).json({ error: errorMessage });
   }
 }
