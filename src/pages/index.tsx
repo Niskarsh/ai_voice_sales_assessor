@@ -9,7 +9,7 @@ interface Message {
 }
 
 const SILENCE_THRESHOLD = 10; // adjust as needed
-const SILENCE_DURATION = 2000; // in ms
+const SILENCE_DURATION = 5000; // in ms
 
 // TypingIndicator component showing 3 animated dots, accepts a color prop
 const TypingIndicator = ({ color = "#ccc" }: { color?: string }) => (
