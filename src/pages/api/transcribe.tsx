@@ -5,6 +5,7 @@ import fs from 'fs';
 import path from 'path';
 import FormData from 'form-data';
 import axios from 'axios';
+import ffmpeg from 'fluent-ffmpeg';
 
 export const config = {
   api: {
@@ -30,6 +31,9 @@ export default async function handler(
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  // Get segment index from query (default to timestamp if not provided)
+  const index = req.query.index || Date.now();
+  
   // Save file to local 'uploads' folder
   const uploadDir = path.join(process.cwd(), 'uploads');
   if (!fs.existsSync(uploadDir)) {
@@ -53,14 +57,31 @@ export default async function handler(
       return res.status(400).json({ error: 'No file provided' });
     }
     const fileObj = Array.isArray(file) ? file[0] : file;
-    const candidateFilePath = fileObj.filepath;
-    if (!candidateFilePath) {
+    const originalPath = fileObj.filepath;
+    if (!originalPath) {
       return res.status(400).json({ error: 'Candidate file path not found' });
     }
 
+    // Convert candidate file to MP3 if needed.
+    const ext = path.extname(originalPath).toLowerCase();
+    let candidateMp3Path = originalPath;
+    if (ext !== '.mp3') {
+      candidateMp3Path = path.join(uploadDir, `segment-${index}-candidate.mp3`);
+      await new Promise<void>((resolve, reject) => {
+        ffmpeg(originalPath)
+          .toFormat('mp3')
+          .on('end', () => {
+            console.log(`Candidate conversion complete: ${candidateMp3Path}`);
+            resolve();
+          })
+          .on('error', (err: Error) => reject(err))
+          .save(candidateMp3Path);
+      });
+    }
+
     const transcriptionForm = new FormData();
-    transcriptionForm.append('file', fs.createReadStream(candidateFilePath));
-    transcriptionForm.append('model', 'whisper-1'); // auto-detect language by omitting 'language'
+    transcriptionForm.append('file', fs.createReadStream(candidateMp3Path));
+    transcriptionForm.append('model', 'whisper-1');
 
     const transcriptionResponse = await axios.post<TranscriptionResponse>(
       'https://api.openai.com/v1/audio/transcriptions',
@@ -76,7 +97,7 @@ export default async function handler(
 
     return res.status(200).json({
       transcript,
-      candidateFile: candidateFilePath,
+      candidateFile: candidateMp3Path,
     });
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';

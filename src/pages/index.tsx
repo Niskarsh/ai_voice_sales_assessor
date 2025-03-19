@@ -1,4 +1,3 @@
-// pages/index.tsx
 import { useState, useRef, useEffect } from 'react';
 import type { NextPage } from 'next';
 import axios from 'axios';
@@ -29,15 +28,9 @@ const TypingIndicator = ({ color = "#ccc" }: { color?: string }) => (
         border-radius: 50%;
         animation: blink 1.4s infinite both;
       }
-      .dot:nth-child(1) {
-        animation-delay: 0s;
-      }
-      .dot:nth-child(2) {
-        animation-delay: 0.2s;
-      }
-      .dot:nth-child(3) {
-        animation-delay: 0.4s;
-      }
+      .dot:nth-child(1) { animation-delay: 0s; }
+      .dot:nth-child(2) { animation-delay: 0.2s; }
+      .dot:nth-child(3) { animation-delay: 0.4s; }
       @keyframes blink {
         0% { opacity: 0.2; }
         20% { opacity: 1; }
@@ -49,7 +42,6 @@ const TypingIndicator = ({ color = "#ccc" }: { color?: string }) => (
 
 const Home: NextPage = () => {
   const [conversation, setConversation] = useState<Message[]>([]);
-  // Use a ref to always have the latest conversation (for payload building)
   const conversationRef = useRef<Message[]>([]);
   const [candidateFiles, setCandidateFiles] = useState<string[]>([]);
   const [ttsFiles, setTtsFiles] = useState<string[]>([]);
@@ -71,6 +63,9 @@ const Home: NextPage = () => {
 
   // Ref for chat container element for auto-scroll
   const chatContainerRef = useRef<HTMLDivElement>(null);
+
+  // Segment counter to provide a sequential index for each segment.
+  const segmentCounterRef = useRef<number>(0);
 
   // Auto-scroll effect: scroll to bottom when conversation updates
   useEffect(() => {
@@ -111,6 +106,7 @@ const Home: NextPage = () => {
       setCandidateFiles([]);
       setTtsFiles([]);
       recordingRef.current = true;
+      segmentCounterRef.current = 0; // reset counter
       startSegmentRecording();
       levelIntervalRef.current = window.setInterval(monitorAudioLevel, 100);
     } catch (error) {
@@ -192,6 +188,10 @@ const Home: NextPage = () => {
 
   // Process a recorded segment
   const processSegment = async (segmentBlob: Blob) => {
+    // Get the segment index and then increment the counter
+    const segmentIndex = segmentCounterRef.current;
+    segmentCounterRef.current += 1;
+    
     // Insert user placeholder before sending to transcribe endpoint
     const userPlaceholderIndex = conversationRef.current.length;
     updateConversation([
@@ -201,11 +201,12 @@ const Home: NextPage = () => {
     lastUserPlaceholderIndexRef.current = userPlaceholderIndex;
 
     const formData = new FormData();
+    // Append segment index as a query parameter for meaningful file naming
     formData.append('file', segmentBlob, 'segment.webm');
 
     try {
-      // Call transcribe endpoint
-      const transcribeRes = await fetch('/api/transcribe', {
+      // Call transcribe endpoint with segment index as query parameter
+      const transcribeRes = await fetch(`/api/transcribe?index=${segmentIndex}`, {
         method: 'POST',
         body: formData,
       });
@@ -226,9 +227,11 @@ const Home: NextPage = () => {
       ]);
       lastAiPlaceholderIndexRef.current = aiPlaceholderIndex;
 
+      // Build assess payload with segment index
       const assessPayload = {
         transcript: transcribeData.transcript,
         conversation: conversationRef.current,
+        segmentIndex: segmentIndex,
       };
       const assessRes = await axios.post('/api/assess', assessPayload, {
         headers: { 'Content-Type': 'application/json' },

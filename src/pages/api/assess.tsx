@@ -3,11 +3,10 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import fs from 'fs';
 import path from 'path';
 import axios from 'axios';
-import { AI_CONTEXT } from '@/constants';
 
 export const config = {
   api: {
-    bodyParser: true, // JSON payload
+    bodyParser: true, // expecting JSON payload
   },
 };
 
@@ -43,30 +42,22 @@ export default async function handler(
   }
   
   try {
-    const { transcript, conversation } = req.body;
+    const { transcript, conversation, segmentIndex } = req.body;
     if (!transcript) {
       return res.status(400).json({ error: 'No transcript provided' });
     }
 
-    // Remove conversation entries where text is empty or 'Processing your message...' or 'AI is typing...
-    let sanitzedConversation = [];
-    if (Array.isArray(conversation)) {
-      sanitzedConversation = conversation.filter(
-        (conversationItem: { sender: 'user' | 'ai'; text: string }) =>
-          conversationItem.text && !['Processing your message...', 'AI is typing...'].includes(conversationItem.text)
-      );
-    }
-
-    // Build chat messages using conversation history (from ref payload)
+    // Build chat messages
     const messages = [
-      { role: 'system', content: AI_CONTEXT },
-      ...(sanitzedConversation.map((conversationItem: { sender: 'user' | 'ai'; text: string }) => ({
-        role: conversationItem.sender === 'user' ? 'user' : 'assistant',
-        content: conversationItem.text,
-      }))),
-      // { role: 'user', content: transcript },
+      { role: 'system', content: 'You are a helpful and critical sales assessor.' },
+      ...conversation.map((item: { sender: 'user' | 'ai'; text: string }) => ({
+        role: item.sender === 'user' ? 'user' : 'assistant',
+        content: item.text,
+      })),
+      { role: 'user', content: transcript },
     ];
     console.log('Chat messages:', messages);
+    
     const chatResponse = await axios.post<ChatResponse>(
       'https://api.openai.com/v1/chat/completions',
       {
@@ -83,7 +74,7 @@ export default async function handler(
     );
     const chatText = chatResponse.data.choices[0].message.content;
 
-    // Call TTS endpoint to generate AI response audio
+    // Generate TTS audio for the AI response
     const ttsPayload = {
       input: chatText,
       model: 'tts-1',
@@ -103,7 +94,7 @@ export default async function handler(
         responseType: 'arraybuffer',
       }
     );
-    const ttsFileName = `aiResponse-${Date.now()}.mp3`;
+    const ttsFileName = `segment-${segmentIndex}-aiResponse.mp3`;
     const ttsFilePath = path.join(uploadDir, ttsFileName);
     fs.writeFileSync(ttsFilePath, Buffer.from(ttsResponse.data, 'binary'));
     const ttsAudioBase64 = Buffer.from(ttsResponse.data, 'binary').toString('base64');
