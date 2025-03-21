@@ -289,17 +289,17 @@ const Home: NextPage = () => {
         !nameEntered ? (
           <div className="overlay">
             <div className="modal">
-              <h1 style={{color: 'black'}}>Enter name</h1>
-              <div className="controls">
+              <h1 style={{ color: 'black', paddingBottom: '10px' }}>Enter name</h1>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                 <input
-                  style={{ height: '50px'}}
+                  style={{ height: '50px' }}
                   type="text"
                   placeholder="Enter your name"
                   onChange={(e) => setName(e.target.value)}
                 />
                 <button
                   className="mic-button"
-                  style={{ width: '100%'}}
+                  style={{ width: '100%' }}
                   onClick={() => setNameEntered(true)}
                 >
                   Submit
@@ -339,6 +339,109 @@ const Home: NextPage = () => {
             <div className="wave"></div>
           </div>
         )}
+        {/* New Product Details Section */}
+        <div className="product-info" style={{ overflowY: 'auto' }}>
+          <h2>Product Information</h2>
+          <p><strong>Product:</strong> Smart Air Purifier - PureAir X100</p>
+          <p><strong>Price:</strong> ₹14,999</p>
+          <h3>Customer Profile</h3>
+          <p><strong>Name:</strong> Kavita Sharma</p>
+          <p><strong>Age:</strong> 42</p>
+          <p><strong>City:</strong> Delhi</p>
+          <h3>Product Overview</h3>
+          <p><strong>Tagline:</strong> Smart, silent, and seriously effective — PureAir X100 makes every breath count.</p>
+          <p><strong>Pitch:</strong> The PureAir X100 is a premium smart air purifier built for Indian households, especially in high-pollution cities like Delhi. It combines hospital-grade filtration with whisper-quiet operation and smart controls, all in a sleek, modern package that fits any room. It’s built for families that care about health, but also comfort and convenience.</p>
+          <h3>Product Features</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Feature</th>
+                <th>Customer Benefit</th>
+                <th>Why it matters</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>HEPA Filter (99.97% efficiency)</td>
+                <td>Removes PM2.5, allergens, and airborne bacteria</td>
+                <td>Protects children and elders from breathing issues</td>
+              </tr>
+              <tr>
+                <td>Real-Time Air Quality Display</td>
+                <td>Customers can see how clean their air is</td>
+                <td>Builds trust and sense of control</td>
+              </tr>
+              <tr>
+                <td>Smart App Integration</td>
+                <td>Control and monitor remotely</td>
+                <td>Set schedules, get filter alerts, and track air trends</td>
+              </tr>
+              <tr>
+                <td>Quiet Sleep Mode</td>
+                <td>No disturbance while sleeping or working</td>
+                <td>Important for bedroom/study use</td>
+              </tr>
+              <tr>
+                <td>Energy Efficient</td>
+                <td>Saves on electricity bills</td>
+                <td>Saves money</td>
+              </tr>
+              <tr>
+                <td>Compact Design</td>
+                <td>Fits anywhere, looks good</td>
+                <td>Important in city flats</td>
+              </tr>
+            </tbody>
+          </table>
+          <h3>Competition</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Brand</th>
+                <th>Price</th>
+                <th>Strength</th>
+                <th>Weakness</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>PureAir X100</td>
+                <td>₹14,999</td>
+                <td>Smart features, quiet, balanced pricing, proven filtration</td>
+                <td>Not a known brand</td>
+              </tr>
+              <tr>
+                <td>Xiaomi Mi Air Purifier 3</td>
+                <td>₹10,999</td>
+                <td>Affordable, minimalist, brand trust</td>
+                <td>Less effective with allergens and PM2.5, no real-time data, basic app</td>
+              </tr>
+              <tr>
+                <td>Philips Series 3000i</td>
+                <td>₹19,999</td>
+                <td>Premium build, great filtration</td>
+                <td>High price, bulky, older technology</td>
+              </tr>
+              <tr>
+                <td>Dyson Purifier Cool</td>
+                <td>₹45,000+</td>
+                <td>Design, fan function, brand</td>
+                <td>Too expensive for filtration, not practical</td>
+              </tr>
+            </tbody>
+          </table>
+          <h3>Common Customer Objections</h3>
+          <ul>
+            <li>Does it really work?</li>
+            <li>It’s too expensive.</li>
+            <li>How often do I change the filter?</li>
+            <li>How much would I spend maintaining it?</li>
+            <li>What’s the service cost?</li>
+            <li>Is it noisy?</li>
+            <li>What is the warranty/guarantee?</li>
+            <li>How’s it different from Xiaomi?</li>
+          </ul>
+        </div>
       </div>
       <div className="right-panel">
         <div className="chat-container" ref={chatContainerRef}>
@@ -361,13 +464,13 @@ const Home: NextPage = () => {
         </div>
       </div>
       <style jsx>{`
-      .overlay {
+        .overlay {
           position: fixed;
           top: 0;
           left: 0;
           width: 100vw;
           height: 100vh;
-          background: rgba(0, 0, 0, 0.5); /* semi-transparent overlay */
+          background: rgba(0, 0, 0, 0.5);
           backdrop-filter: blur(8px);
           display: flex;
           align-items: center;
@@ -383,50 +486,17 @@ const Home: NextPage = () => {
           text-align: center;
         }
         .controls {
-          margin-top: 1rem;
+          // margin-top: 1rem;
           display: flex;
-          flex-direction: column;
+          flex-direction: row-reverse;
           gap: 1rem;
+          width: '70%';
+          
         }
         input {
           padding: 0.5rem 1rem;
           border: 1px solid #ccc;
           border-radius: 4px;
-        }
-        .mic-button {
-          padding: 0.75rem 1.25rem;
-          border: none;
-          border-radius: 4px;
-          background-color: #0070f3;
-          color: #fff;
-          cursor: pointer;
-        }
-        .main-container {
-          display: flex;
-          height: 100vh;
-          background-color: #000;
-          color: #fff;
-          font-family: Arial, sans-serif;
-        }
-        .left-panel {
-          width: 30%;
-          padding: 2rem;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          background-color: #222;
-          box-shadow: 2px 0 5px rgba(255, 255, 255, 0.1);
-        }
-        .left-panel h1 {
-          margin-bottom: 2rem;
-          font-size: 1.5rem;
-          color: #FFD700;
-        }
-        .controls {
-          display: flex;
-          flex-direction: column;
-          gap: 1rem;
-          margin-bottom: 2rem;
         }
         .mic-button, .conv-complete {
           padding: 0.75rem 1.25rem;
@@ -482,6 +552,27 @@ const Home: NextPage = () => {
           50% { height: 90%; }
           100% { height: 10%; }
         }
+        .main-container {
+          display: flex;
+          height: 100vh;
+          background-color: #000;
+          color: #fff;
+          font-family: Arial, sans-serif;
+        }
+        .left-panel {
+          width: 40%;
+          padding: 2rem;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          background-color: #222;
+          box-shadow: 2px 0 5px rgba(255, 255, 255, 0.1);
+        }
+        .left-panel h1 {
+          margin-bottom: 2rem;
+          font-size: 1.5rem;
+          color: #FFD700;
+        }
         .right-panel {
           flex: 1;
           display: flex;
@@ -535,9 +626,41 @@ const Home: NextPage = () => {
           line-height: 1.4;
           white-space: pre-wrap;
         }
+        /* Styles for the new product info section */
+        .product-info {
+          margin-top: 2rem;
+          width: 100%;
+          background: #333;
+          padding: 1rem;
+          border-radius: 8px;
+          font-size: 0.9rem;
+          color: #fff;
+        }
+        .product-info h2,
+        .product-info h3 {
+          margin-top: 1rem;
+          margin-bottom: 0.5rem;
+        }
+        .product-info p {
+          margin: 0.3rem 0;
+        }
+        .product-info table {
+          width: 100%;
+          border-collapse: collapse;
+          margin: 0.5rem 0;
+        }
+        .product-info th,
+        .product-info td {
+          border: 1px solid #555;
+          padding: 0.5rem;
+          text-align: left;
+        }
+        .product-info ul {
+          margin: 0.5rem 0;
+          padding-left: 1.2rem;
+        }
       `}</style>
     </div>
-
   );
 };
 
