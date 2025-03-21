@@ -49,6 +49,8 @@ const TypingIndicator = ({ color = "#ccc" }: { color?: string }) => (
 
 const Home: NextPage = () => {
   const [conversation, setConversation] = useState<Message[]>([]);
+  const [name, setName] = useState<string | null>(null);
+  const [nameEntered, setNameEntered] = useState<boolean>(false);
   // Use a ref to always have the latest conversation (for payload building)
   const conversationRef = useRef<Message[]>([]);
   const [candidateFiles, setCandidateFiles] = useState<string[]>([]);
@@ -280,10 +282,36 @@ const Home: NextPage = () => {
     }
   };
 
+  console.log('name', (name && name.length));
   return (
     <div className="main-container">
+      {
+        !nameEntered ? (
+          <div className="overlay">
+            <div className="modal">
+              <h1 style={{color: 'black'}}>Enter name</h1>
+              <div className="controls">
+                <input
+                  style={{ height: '50px'}}
+                  type="text"
+                  placeholder="Enter your name"
+                  onChange={(e) => setName(e.target.value)}
+                />
+                <button
+                  className="mic-button"
+                  style={{ width: '100%'}}
+                  onClick={() => setNameEntered(true)}
+                >
+                  Submit
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null
+      }
+
       <div className="left-panel">
-        <h1>AI Sales Skill Assessor</h1>
+        <h1>{`Hello ${name}`}</h1>
         <div className="controls">
           {recordingRef.current ? (
             <button className="mic-button" onClick={stopConversation}>
@@ -333,6 +361,46 @@ const Home: NextPage = () => {
         </div>
       </div>
       <style jsx>{`
+      .overlay {
+          position: fixed;
+          top: 0;
+          left: 0;
+          width: 100vw;
+          height: 100vh;
+          background: rgba(0, 0, 0, 0.5); /* semi-transparent overlay */
+          backdrop-filter: blur(8px);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 9999;
+        }
+        .modal {
+          background: #fff;
+          padding: 2rem;
+          padding-bottom: 1rem;
+          border-radius: 8px;
+          box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+          text-align: center;
+        }
+        .controls {
+          margin-top: 1rem;
+          display: flex;
+          flex-direction: column;
+          gap: 1rem;
+        }
+        input {
+          padding: 0.5rem 1rem;
+          border: 1px solid #ccc;
+          border-radius: 4px;
+        }
+        .mic-button {
+          padding: 0.75rem 1.25rem;
+          border: none;
+          border-radius: 4px;
+          background-color: #0070f3;
+          color: #fff;
+          cursor: pointer;
+        }
         .main-container {
           display: flex;
           height: 100vh;
@@ -469,6 +537,7 @@ const Home: NextPage = () => {
         }
       `}</style>
     </div>
+
   );
 };
 
