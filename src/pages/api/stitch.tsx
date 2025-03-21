@@ -4,6 +4,7 @@ import ffmpeg from 'fluent-ffmpeg';
 import ffmpegPath from 'ffmpeg-static';
 import fs from 'fs';
 import path from 'path';
+import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 
 export const config = {
   api: {
@@ -12,7 +13,7 @@ export const config = {
 };
 
 type Data = {
-  stitchedAudio?: string; // base64-encoded audio
+  stitchedAudioUrl?: string; // URL of the uploaded file
   error?: string;
 };
 
@@ -24,10 +25,11 @@ export default async function handler(
     return res.status(405).json({ error: 'Method not allowed' });
   }
   try {
-    const { candidateFiles, ttsFiles } = req.body;
+    const { candidateFiles, ttsFiles, name } = req.body;
     if (
       !candidateFiles ||
       !ttsFiles ||
+      !name ||
       !Array.isArray(candidateFiles) ||
       !Array.isArray(ttsFiles)
     ) {
@@ -95,14 +97,57 @@ export default async function handler(
         .save(stitchedPath);
     });
 
-    // Read and encode stitched audio.
-    const stitchedBuffer = fs.readFileSync(stitchedPath);
-    const stitchedBase64 = stitchedBuffer.toString('base64');
+    const { AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION, AWS_S3_BUCKET } = process.env;
+    if (!AWS_ACCESS_KEY_ID || !AWS_SECRET_ACCESS_KEY || !AWS_REGION || !AWS_S3_BUCKET) {
+      return res.status(500).json({ error: 'AWS credentials not found' });
+    }
+    // Upload the stitched file to S3.
+    const s3Client = new S3Client({
+      region: AWS_REGION,
+      credentials: {
+        accessKeyId: AWS_ACCESS_KEY_ID,
+        secretAccessKey: AWS_SECRET_ACCESS_KEY,
+      },
+      useAccelerateEndpoint: true,
+    });
+    const fileStream = fs.createReadStream(stitchedPath);
+    const s3Key = `voice_recordings/${name.trim()}-${Date.now()}.mp3`;
+    const putCommand = new PutObjectCommand({
+      Bucket: AWS_S3_BUCKET,
+      Key: s3Key,
+      Body: fileStream,
+      ContentType: 'audio/mp3',
+    });
 
-    // Cleanup: remove temporary file list.
-    fs.unlinkSync(concatListPath);
+    await s3Client.send(putCommand);
+    console.log(`Uploaded stitched file to S3 at key: ${s3Key}`);
 
-    return res.status(200).json({ stitchedAudio: stitchedBase64 });
+    // Optionally, generate a public URL (if your bucket policy allows public read)
+    const stitchedAudioUrl = `https://${AWS_S3_BUCKET}.s3.${AWS_REGION}.amazonaws.com/${s3Key}`;
+
+    // Build a set of files to delete (only those involved in this session).
+    const filesToDelete = new Set<string>();
+    // Files passed in req.body.
+    candidateFiles.forEach((file: string) => filesToDelete.add(file));
+    ttsFiles.forEach((file: string) => filesToDelete.add(file));
+    // Files created in this function.
+    candidateMp3Files.forEach((file: string) => filesToDelete.add(file));
+    filesToDelete.add(concatListPath);
+    filesToDelete.add(stitchedPath);
+
+    // Delete each file if it exists.
+    for (const filePath of filesToDelete) {
+      try {
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+          console.log(`Deleted file: ${filePath}`);
+        }
+      } catch (err) {
+        console.error(`Failed to delete ${filePath}:`, err);
+      }
+    }
+
+    return res.status(200).json({ stitchedAudioUrl });
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return res.status(500).json({ error: errorMessage });

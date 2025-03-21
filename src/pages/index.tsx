@@ -268,15 +268,16 @@ const Home: NextPage = () => {
         body: JSON.stringify({
           candidateFiles,
           ttsFiles,
+          name,
         }),
       });
-      const data = await res.json();
-      if (data.stitchedAudio) {
-        const audio = new Audio(`data:audio/mp3;base64,${data.stitchedAudio}`);
-        audio.play();
-      } else {
-        console.error('Stitching error:', data.error);
-      }
+      await res.json();
+      // if (data.stitchedAudio) {
+      //   const audio = new Audio(`data:audio/mp3;base64,${data.stitchedAudio}`);
+      //   audio.play();
+      // } else {
+      //   console.error('Stitching error:', data.error);
+      // }
     } catch (error) {
       console.error('Error stitching conversation:', error);
     }
