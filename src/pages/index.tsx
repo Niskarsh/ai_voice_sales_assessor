@@ -51,6 +51,7 @@ const Home: NextPage = () => {
   const [conversation, setConversation] = useState<Message[]>([]);
   const [name, setName] = useState<string | null>(null);
   const [nameEntered, setNameEntered] = useState<boolean>(false);
+  const [uploading, setUploading] = useState(false); // New state for upload skeleton
   // Use a ref to always have the latest conversation (for payload building)
   const conversationRef = useRef<Message[]>([]);
   const [candidateFiles, setCandidateFiles] = useState<string[]>([]);
@@ -261,6 +262,7 @@ const Home: NextPage = () => {
 
   // Stitch conversation segments together
   const completeConversation = async () => {
+    setUploading(true);
     try {
       const res = await fetch('/api/stitch', {
         method: 'POST',
@@ -272,14 +274,10 @@ const Home: NextPage = () => {
         }),
       });
       await res.json();
-      // if (data.stitchedAudio) {
-      //   const audio = new Audio(`data:audio/mp3;base64,${data.stitchedAudio}`);
-      //   audio.play();
-      // } else {
-      //   console.error('Stitching error:', data.error);
-      // }
     } catch (error) {
       console.error('Error stitching conversation:', error);
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -326,11 +324,16 @@ const Home: NextPage = () => {
           <button
             className="conv-complete"
             onClick={completeConversation}
-            disabled={candidateFiles.length === 0 || ttsFiles.length === 0}
+            disabled={candidateFiles.length === 0 || ttsFiles.length === 0 || uploading}
           >
             Conversation Complete
           </button>
         </div>
+        {uploading && (
+          <div className="upload-skeleton">
+            Conversation uploading...
+          </div>
+        )}
         {recordingRef.current && listening && (
           <div className="listening-indicator">
             <div className="wave"></div>
@@ -488,12 +491,9 @@ const Home: NextPage = () => {
           min-width: 20%;
         }
         .controls {
-          // margin-top: 1rem;
           display: flex;
           flex-direction: row-reverse;
           gap: 1rem;
-          width: '70%';
-          
         }
         input {
           padding: 0.5rem 1rem;
@@ -575,6 +575,15 @@ const Home: NextPage = () => {
           font-size: 1.5rem;
           color: #FFD700;
         }
+        .upload-skeleton {
+          margin-top: 1rem;
+          padding: 1rem;
+          background-color: #444;
+          border-radius: 4px;
+          font-size: 1rem;
+          text-align: center;
+          width: 100%;
+        }
         .right-panel {
           flex: 1;
           display: flex;
@@ -628,7 +637,7 @@ const Home: NextPage = () => {
           line-height: 1.4;
           white-space: pre-wrap;
         }
-        /* Styles for the new product info section */
+        /* Styles for the product info section */
         .product-info {
           margin-top: 2rem;
           width: 100%;
