@@ -66,7 +66,7 @@ export default async function handler(
       }))),
       // { role: 'user', content: transcript },
     ];
-    console.log('Chat messages:', messages);
+    // console.log('Chat messages:', messages);
     const chatResponse = await axios.post<ChatResponse>(
       'https://api.openai.com/v1/chat/completions',
       {
