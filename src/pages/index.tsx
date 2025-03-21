@@ -290,7 +290,7 @@ const Home: NextPage = () => {
         !nameEntered ? (
           <div className="overlay">
             <div className="modal">
-              <h1 style={{ color: 'black', paddingBottom: '10px' }}>Enter name</h1>
+              <h1 style={{ color: 'black', marginBottom: '20px' }}>Enter name</h1>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                 <input
                   style={{ height: '50px' }}
@@ -300,7 +300,7 @@ const Home: NextPage = () => {
                 />
                 <button
                   className="mic-button"
-                  style={{ width: '100%' }}
+                  style={{ width: '100%', marginBottom: '20px' }}
                   onClick={() => setNameEntered(true)}
                 >
                   Submit
@@ -485,6 +485,7 @@ const Home: NextPage = () => {
           border-radius: 8px;
           box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
           text-align: center;
+          min-width: 20%;
         }
         .controls {
           // margin-top: 1rem;
