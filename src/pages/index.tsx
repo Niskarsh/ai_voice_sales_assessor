@@ -284,30 +284,28 @@ const Home: NextPage = () => {
   console.log('name', (name && name.length));
   return (
     <div className="main-container">
-      {
-        !nameEntered ? (
-          <div className="overlay">
-            <div className="modal">
-              <h1 style={{ color: 'black', marginBottom: '20px' }}>Enter name</h1>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                <input
-                  style={{ height: '50px' }}
-                  type="text"
-                  placeholder="Enter your name"
-                  onChange={(e) => setName(e.target.value)}
-                />
-                <button
-                  className="mic-button"
-                  style={{ width: '100%', marginBottom: '20px' }}
-                  onClick={() => setNameEntered(true)}
-                >
-                  Submit
-                </button>
-              </div>
+      {!nameEntered ? (
+        <div className="overlay">
+          <div className="modal">
+            <h1 style={{ color: 'black', marginBottom: '20px' }}>Enter name</h1>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <input
+                style={{ height: '50px' }}
+                type="text"
+                placeholder="Enter your name"
+                onChange={(e) => setName(e.target.value)}
+              />
+              <button
+                className="mic-button"
+                style={{ width: '100%', marginBottom: '20px' }}
+                onClick={() => setNameEntered(true)}
+              >
+                Submit
+              </button>
             </div>
           </div>
-        ) : null
-      }
+        </div>
+      ) : null}
 
       <div className="left-panel">
         <h1>{`Hello ${name}`}</h1>
@@ -330,9 +328,7 @@ const Home: NextPage = () => {
           </button>
         </div>
         {uploading && (
-          <div className="upload-skeleton">
-            Conversation uploading...
-          </div>
+          <div className="upload-skeleton">Conversation uploading...</div>
         )}
         {recordingRef.current && listening && (
           <div className="listening-indicator">
@@ -343,117 +339,137 @@ const Home: NextPage = () => {
             <div className="wave"></div>
           </div>
         )}
-        {/* New Product Details Section */}
+        {/* Updated Product Info Section */}
         <div className="product-info" style={{ overflowY: 'auto' }}>
-          <h2>Product Information</h2>
-          <p><strong>Product:</strong> Smart Air Purifier - PureAir X100</p>
-          <p><strong>Price:</strong> ₹14,999</p>
-          <h3>Customer Profile</h3>
-          <p><strong>Name:</strong> Kavita Sharma</p>
-          <p><strong>Age:</strong> 42</p>
-          <p><strong>City:</strong> Delhi</p>
-          <h3>Product Overview</h3>
-          <p><strong>Tagline:</strong> Smart, silent, and seriously effective — PureAir X100 makes every breath count.</p>
-          <p><strong>Pitch:</strong> The PureAir X100 is a premium smart air purifier built for Indian households, especially in high-pollution cities like Delhi. It combines hospital-grade filtration with whisper-quiet operation and smart controls, all in a sleek, modern package that fits any room. It’s built for families that care about health, but also comfort and convenience.</p>
-          <h3>Product Features</h3>
-          <table>
-            <thead>
-              <tr>
-                <th>Feature</th>
-                <th>Customer Benefit</th>
-                <th>Why it matters</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td>HEPA Filter (99.97% efficiency)</td>
-                <td>Removes PM2.5, allergens, and airborne bacteria</td>
-                <td>Protects children and elders from breathing issues</td>
-              </tr>
-              <tr>
-                <td>Real-Time Air Quality Display</td>
-                <td>Customers can see how clean their air is</td>
-                <td>Builds trust and sense of control</td>
-              </tr>
-              <tr>
-                <td>Smart App Integration</td>
-                <td>Control and monitor remotely</td>
-                <td>Set schedules, get filter alerts, and track air trends</td>
-              </tr>
-              <tr>
-                <td>Quiet Sleep Mode</td>
-                <td>No disturbance while sleeping or working</td>
-                <td>Important for bedroom/study use</td>
-              </tr>
-              <tr>
-                <td>Energy Efficient</td>
-                <td>Saves on electricity bills</td>
-                <td>Saves money</td>
-              </tr>
-              <tr>
-                <td>Compact Design</td>
-                <td>Fits anywhere, looks good</td>
-                <td>Important in city flats</td>
-              </tr>
-            </tbody>
-          </table>
-          <h3>Competition</h3>
-          <table>
-            <thead>
-              <tr>
-                <th>Brand</th>
-                <th>Price</th>
-                <th>Strength</th>
-                <th>Weakness</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td>PureAir X100</td>
-                <td>₹14,999</td>
-                <td>Smart features, quiet, balanced pricing, proven filtration</td>
-                <td>Not a known brand</td>
-              </tr>
-              <tr>
-                <td>Xiaomi Mi Air Purifier 3</td>
-                <td>₹10,999</td>
-                <td>Affordable, minimalist, brand trust</td>
-                <td>Less effective with allergens and PM2.5, no real-time data, basic app</td>
-              </tr>
-              <tr>
-                <td>Philips Series 3000i</td>
-                <td>₹19,999</td>
-                <td>Premium build, great filtration</td>
-                <td>High price, bulky, older technology</td>
-              </tr>
-              <tr>
-                <td>Dyson Purifier Cool</td>
-                <td>₹45,000+</td>
-                <td>Design, fan function, brand</td>
-                <td>Too expensive for filtration, not practical</td>
-              </tr>
-            </tbody>
-          </table>
-          <h3>Common Customer Objections</h3>
+          <h2>Cold Call Script</h2>
+          <h3>Product Details</h3>
+          <p><strong>Product:</strong> EduNest – Smart Learning App for Children</p>
+          <p><strong>Price:</strong> ₹2,499/year per child</p>
+          <h3>Final Objective</h3>
+          <p>Get customer to share their email ID or phone number so we can send a WhatsApp link or demo of the product.</p>
+          <h3>Introduction</h3>
+          <p>Hello, is this Jane Smith? <em>(Wait for response)</em></p>
+          <p>
+            Hi Jane, my name is [Your name]] and I’m calling from EduNest. We help parents like you manage screen time while boosting real learning for kids aged 6 to 12. I just wanted to quickly share what we do — no pressure, you can decide if it’s useful or not. Is now a good time to talk for 2 minutes?
+          </p>
+          <h3>Warm-Up Question</h3>
+          <p>Just to get a sense, are your kids using any online learning apps or websites right now?</p>
+          <p>
+            <strong>If No:</strong> That’s completely okay. Many parents are cautious — especially about screen time. That’s exactly what we focus on. EduNest helps create short, effective learning routines with strict screen-time limits and real educator support.
+          </p>
+          <p>
+            <strong>If Yes:</strong> That’s great! If you don’t mind me asking, which one are they using, and are you happy with how it’s going? Any concerns?
+          </p>
+          <h3>Pitch: Why EduNest?</h3>
+          <p>EduNest is designed by child psychologists and educators to improve real-world learning outcomes.</p>
+          <p><strong>Key Benefits:</strong></p>
           <ul>
-            <li>Does it really work?</li>
-            <li>It’s too expensive.</li>
-            <li>How often do I change the filter?</li>
-            <li>How much would I spend maintaining it?</li>
-            <li>What’s the service cost?</li>
-            <li>Is it noisy?</li>
-            <li>What is the warranty/guarantee?</li>
-            <li>How’s it different from Xiaomi?</li>
+            <li>Covers Math, English, and Science aligned with CBSE & ICSE</li>
+            <li>Learning limited to 30 minutes per day with built-in screen-time control</li>
+            <li>Adaptive difficulty based on each child’s performance</li>
+            <li>Daily fun challenges: logic puzzles, reading, speaking, creative tasks</li>
+            <li>No ads, no distractions, and no external links</li>
+            <li>Monthly parent report on each child’s progress</li>
+            <li>Parent dashboard to control access and view activity</li>
+            <li>100% safe — no personal data sharing or third-party access</li>
           </ul>
+          <h3>Common Questions & Answers</h3>
+            <ul>
+            <li>
+              <strong>Q:</strong> How much is it?<br />
+              <strong>A:</strong> ₹2,499 per child for the full year. No hidden charges.
+            </li>
+            <li>
+              <strong>Q:</strong> Can both kids use the same plan?<br />
+              <strong>A:</strong> No, each child gets a personalized plan. You’d need two subscriptions — but we do offer a family discount.
+            </li>
+            <li>
+              <strong>Q:</strong> Will it increase screen time?<br />
+              <strong>A:</strong> No — it’s capped at 30 minutes/day. After that, it auto locks.
+            </li>
+            <li>
+              <strong>Q:</strong> What age is it designed for?<br />
+              <strong>A:</strong> Ideal for children aged 6 to 12 — so perfect for your 7- and 9-year-olds.
+            </li>
+            <li>
+              <strong>Q:</strong> How is this different from BYJU’S or similar platforms?<br />
+              <strong>A:</strong> BYJU’S focuses on long video lectures. EduNest emphasizes short, structured, daily habits for real learning — without pushing sales or distractions.
+            </li>
+            <li>
+              <strong>Q:</strong> What about data privacy?<br />
+              <strong>A:</strong> 100% parent-controlled. We don’t sell, share, or use personal data. You can delete your data anytime.
+            </li>
+            </ul>
+          <h3>Promotions / Offers</h3>
+          <ul>
+            <li>7-Day Free Trial — No payment or commitment required.</li>
+            <li>₹500 OFF if you subscribe today for both kids.</li>
+            <li>Free printable activity worksheets every month to support offline learning.</li>
+          </ul>
+          <h3>Closing Statement</h3>
+          <p>
+            Parveen, I’d love to send you a quick WhatsApp or email with the full details, a short demo video, and a trial form. What would be the best phone number or email ID to send it to?
+          </p>
+          <p>
+            <strong>If Yes:</strong> Great! I’m sending it now. Thanks for your time — I hope your kids enjoy the experience!
+          </p>
+          <p>
+            <strong>If Unsure / No:</strong> No problem at all. Thanks for listening. If you ever want to revisit it, feel free to reach me anytime. Take care!
+          </p>
+          <h3>Quick Facts – Internal Reference</h3>
+          <table border={1} cellPadding={5} cellSpacing={0}>
+            <thead>
+              <tr>
+                <th>Detail</th>
+                <th>Info</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Product Name</td>
+                <td>EduNest Learning App</td>
+              </tr>
+              <tr>
+                <td>Price</td>
+                <td>₹2,499/year per child</td>
+              </tr>
+              <tr>
+                <td>Subjects</td>
+                <td>Math, English, Science (CBSE & ICSE aligned)</td>
+              </tr>
+              <tr>
+                <td>Usage Limit</td>
+                <td>30 mins/day</td>
+              </tr>
+              <tr>
+                <td>Age Group</td>
+                <td>6–12 years</td>
+              </tr>
+              <tr>
+                <td>Trial</td>
+                <td>7-day free trial</td>
+              </tr>
+              <tr>
+                <td>Data Privacy</td>
+                <td>Fully secure and parent-controlled</td>
+              </tr>
+              <tr>
+                <td>Unique Benefit</td>
+                <td>Short, real learning habits + no sales pressure</td>
+              </tr>
+              <tr>
+                <td>Offers</td>
+                <td>Trial / Family Discount / Monthly Worksheets</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
       <div className="right-panel">
         <div className="chat-container" ref={chatContainerRef}>
           {conversation.map((msg, idx) => (
             <div key={idx} className={`chat-bubble ${msg.sender}`}>
-              <span className="sender">
-                {msg.sender === 'user' ? 'You' : 'Customer'}
-              </span>
+              <span className="sender">{msg.sender === 'user' ? 'You' : 'Customer'}</span>
               <div className="message">
                 {msg.sender === 'ai' && msg.text === 'AI is typing...' ? (
                   <TypingIndicator color="#FFA500" />
@@ -500,7 +516,8 @@ const Home: NextPage = () => {
           border: 1px solid #ccc;
           border-radius: 4px;
         }
-        .mic-button, .conv-complete {
+        .mic-button,
+        .conv-complete {
           padding: 0.75rem 1.25rem;
           border: none;
           border-radius: 4px;
@@ -524,7 +541,8 @@ const Home: NextPage = () => {
         .conv-complete:hover:not(:disabled) {
           background-color: #e69500;
         }
-        .mic-button:disabled, .conv-complete:disabled {
+        .mic-button:disabled,
+        .conv-complete:disabled {
           background-color: #555;
           cursor: not-allowed;
         }
@@ -637,7 +655,7 @@ const Home: NextPage = () => {
           line-height: 1.4;
           white-space: pre-wrap;
         }
-        /* Styles for the product info section */
+        /* Styles for the updated product info section */
         .product-info {
           margin-top: 2rem;
           width: 100%;
@@ -655,20 +673,10 @@ const Home: NextPage = () => {
         .product-info p {
           margin: 0.3rem 0;
         }
+        .product-info ul,
+        .product-info dl,
         .product-info table {
-          width: 100%;
-          border-collapse: collapse;
           margin: 0.5rem 0;
-        }
-        .product-info th,
-        .product-info td {
-          border: 1px solid #555;
-          padding: 0.5rem;
-          text-align: left;
-        }
-        .product-info ul {
-          margin: 0.5rem 0;
-          padding-left: 1.2rem;
         }
       `}</style>
     </div>
