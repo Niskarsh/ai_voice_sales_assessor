@@ -356,7 +356,7 @@ const Home: NextPage = () => {
           <p><strong>Concerns:</strong> Screen time impact, actual learning outcomes, usability for both kids, price</p>
           <h3>Product Details</h3>
           <p><strong>Product:</strong> EduNest – Smart Learning App for Children</p>
-          <p><strong>Price:</strong> ₹2,499/year per child</p>
+          <p><strong>Price:</strong> $249 /year per child</p>
           <h3>Final Objective</h3>
           <p>Get customer to share their email ID or phone number so we can send a WhatsApp link or demo of the product.</p>
           <h3>Introduction</h3>
@@ -443,7 +443,7 @@ const Home: NextPage = () => {
               </tr>
               <tr>
                 <td>Price</td>
-                <td>₹2,499/year per child</td>
+                <td>$249 /year per child</td>
               </tr>
               <tr>
                 <td>Subjects</td>
