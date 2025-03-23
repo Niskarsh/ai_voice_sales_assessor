@@ -342,6 +342,18 @@ const Home: NextPage = () => {
         {/* Updated Product Info Section */}
         <div className="product-info" style={{ overflowY: 'auto' }}>
           <h2>Cold Call Script</h2>
+          <h3>Customer Profile</h3>
+          <p><strong>Name:</strong> Jane Smith</p>
+          <p><strong>Age:</strong> 39</p>
+          <p><strong>Sex:</strong> Female</p>
+          <p><strong>Location:</strong> Houston, Texas</p>
+          <p><strong>Marital Status:</strong> Married with 2 children (7 &amp; 9)</p>
+          <p><strong>Tech Savviness:</strong> Moderate (uses Facebook, orders online, but cautious)</p>
+          <p><strong>Occupation:</strong> School Administrator</p>
+          <p><strong>Income:</strong> Middle class</p>
+          <p><strong>Interests:</strong> Education, discipline, balanced routines</p>
+          <p><strong>Personality:</strong> Warm but cautious, values trust, dislikes sales pressure</p>
+          <p><strong>Concerns:</strong> Screen time impact, actual learning outcomes, usability for both kids, price</p>
           <h3>Product Details</h3>
           <p><strong>Product:</strong> EduNest – Smart Learning App for Children</p>
           <p><strong>Price:</strong> ₹2,499/year per child</p>
@@ -350,7 +362,7 @@ const Home: NextPage = () => {
           <h3>Introduction</h3>
           <p>Hello, is this Jane Smith? <em>(Wait for response)</em></p>
           <p>
-            Hi Jane, my name is [Your name]] and I’m calling from EduNest. We help parents like you manage screen time while boosting real learning for kids aged 6 to 12. I just wanted to quickly share what we do — no pressure, you can decide if it’s useful or not. Is now a good time to talk for 2 minutes?
+            Hi Jane, my name is Ankit and I’m calling from EduNest. We help parents like you manage screen time while boosting real learning for kids aged 6 to 12. I just wanted to quickly share what we do — no pressure, you can decide if it’s useful or not. Is now a good time to talk for 2 minutes?
           </p>
           <h3>Warm-Up Question</h3>
           <p>Just to get a sense, are your kids using any online learning apps or websites right now?</p>
@@ -364,7 +376,7 @@ const Home: NextPage = () => {
           <p>EduNest is designed by child psychologists and educators to improve real-world learning outcomes.</p>
           <p><strong>Key Benefits:</strong></p>
           <ul>
-            <li>Covers Math, English, and Science aligned with CBSE & ICSE</li>
+            <li>Covers Math, English, and Science aligned with CBSE &amp; ICSE</li>
             <li>Learning limited to 30 minutes per day with built-in screen-time control</li>
             <li>Adaptive difficulty based on each child’s performance</li>
             <li>Daily fun challenges: logic puzzles, reading, speaking, creative tasks</li>
@@ -373,8 +385,8 @@ const Home: NextPage = () => {
             <li>Parent dashboard to control access and view activity</li>
             <li>100% safe — no personal data sharing or third-party access</li>
           </ul>
-          <h3>Common Questions & Answers</h3>
-            <ul>
+          <h3>Common Questions &amp; Answers</h3>
+          <ul>
             <li>
               <strong>Q:</strong> How much is it?<br />
               <strong>A:</strong> ₹2,499 per child for the full year. No hidden charges.
@@ -392,14 +404,14 @@ const Home: NextPage = () => {
               <strong>A:</strong> Ideal for children aged 6 to 12 — so perfect for your 7- and 9-year-olds.
             </li>
             <li>
-              <strong>Q:</strong> How is this different from BYJU’S or similar platforms?<br />
+              <strong>Q:</strong> How is this different from Outschool or similar platforms?<br />
               <strong>A:</strong> BYJU’S focuses on long video lectures. EduNest emphasizes short, structured, daily habits for real learning — without pushing sales or distractions.
             </li>
             <li>
               <strong>Q:</strong> What about data privacy?<br />
               <strong>A:</strong> 100% parent-controlled. We don’t sell, share, or use personal data. You can delete your data anytime.
             </li>
-            </ul>
+          </ul>
           <h3>Promotions / Offers</h3>
           <ul>
             <li>7-Day Free Trial — No payment or commitment required.</li>
@@ -435,7 +447,7 @@ const Home: NextPage = () => {
               </tr>
               <tr>
                 <td>Subjects</td>
-                <td>Math, English, Science (CBSE & ICSE aligned)</td>
+                <td>Math, English, Science (CBSE &amp; ICSE aligned)</td>
               </tr>
               <tr>
                 <td>Usage Limit</td>
