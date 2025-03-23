@@ -389,7 +389,7 @@ const Home: NextPage = () => {
           <ul>
             <li>
               <strong>Q:</strong> How much is it?<br />
-              <strong>A:</strong> ₹2,499 per child for the full year. No hidden charges.
+              <strong>A:</strong> $249per child for the full year. No hidden charges.
             </li>
             <li>
               <strong>Q:</strong> Can both kids use the same plan?<br />
@@ -415,7 +415,7 @@ const Home: NextPage = () => {
           <h3>Promotions / Offers</h3>
           <ul>
             <li>7-Day Free Trial — No payment or commitment required.</li>
-            <li>₹500 OFF if you subscribe today for both kids.</li>
+            <li>$50 OFF if you subscribe today for both kids.</li>
             <li>Free printable activity worksheets every month to support offline learning.</li>
           </ul>
           <h3>Closing Statement</h3>
