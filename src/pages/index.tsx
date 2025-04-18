@@ -97,6 +97,13 @@ const Home: NextPage = () => {
     setConversation(updated);
   };
 
+  const playStreamingTTS = (text: string, onEnded: () => void) => {
+    const audio = new Audio(`/api/tts?q=${encodeURIComponent(text)}`);
+    audio.play().catch(console.error);                  // progressive MP3 :contentReference[oaicite:2]{index=2}
+    audio.onended = onEnded;
+  };
+  
+
   // Start continuous conversation
   const startConversation = async () => {
     try {
@@ -245,14 +252,21 @@ const Home: NextPage = () => {
         setTtsFiles((prev) => [...prev, assessData.ttsFile]);
       }
       // Play TTS audio and then start new segment when finished
-      if (assessData.ttsAudio) {
-        const audio = new Audio(`data:audio/mp3;base64,${assessData.ttsAudio}`);
-        audio.play();
-        audio.onended = () => {
+      // if (assessData.ttsAudio) {
+      //   const audio = new Audio(`data:audio/mp3;base64,${assessData.ttsAudio}`);
+      //   audio.play();
+      //   audio.onended = () => {
+      //     if (recordingRef.current) startSegmentRecording();
+      //   };
+      // } else {
+      //   if (recordingRef.current) startSegmentRecording();
+      // }
+      if (assessData.chatResponse) {
+        playStreamingTTS(assessData.chatResponse, () => {
           if (recordingRef.current) startSegmentRecording();
-        };
-      } else {
-        if (recordingRef.current) startSegmentRecording();
+        });
+      } else if (recordingRef.current) {
+        startSegmentRecording();
       }
     } catch (error) {
       console.error('Error processing segment:', error);
@@ -319,13 +333,13 @@ const Home: NextPage = () => {
               <span className="mic-icon">🎤</span> Start
             </button>
           )}
-          <button
+          {/* <button
             className="conv-complete"
             onClick={completeConversation}
             disabled={candidateFiles.length === 0 || ttsFiles.length === 0 || uploading}
           >
             Conversation Complete
-          </button>
+          </button> */}
         </div>
         {uploading && (
           <div className="upload-skeleton">Conversation uploading...</div>
