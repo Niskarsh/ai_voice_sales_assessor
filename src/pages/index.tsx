@@ -93,7 +93,7 @@ const Home: NextPage = () => {
     /* --------------------------------------------------------------- *
       *  ① open browser → /api/stt WebSocket                            *
       * --------------------------------------------------------------- */
-    sttWsRef.current = new WebSocket(`${process.env.NEXT_PUBLIC_WEBSOCKET_URL!}/ws`);
+    sttWsRef.current = new WebSocket(new URL('/ws', process.env.NEXT_PUBLIC_WEBSOCKET_URL!).toString());
     sttWsRef.current.binaryType = 'arraybuffer';
     sttWsRef.current.onclose = stopConversation;
   }, []);
