@@ -49,15 +49,20 @@ const TypingIndicator = ({ color = "#ccc" }: { color?: string }) => (
 
 const Home: NextPage = () => {
   const [conversation, setConversation] = useState<Message[]>([]);
-  const [name, setName] = useState<string | null>(null);
+  const [name, setName] = useState<string | null>('nik');
   const [nameEntered, setNameEntered] = useState<boolean>(false);
-  const [uploading, setUploading] = useState(false); // New state for upload skeleton
+  const [uploading,
+    // setUploading,
+  ] = useState(false); // New state for upload skeleton
   // Use a ref to always have the latest conversation (for payload building)
   const conversationRef = useRef<Message[]>([]);
-  const [candidateFiles, setCandidateFiles] = useState<string[]>([]);
-  const [ttsFiles, setTtsFiles] = useState<string[]>([]);
-  const [listening, setListening] = useState(false);
-
+  // const [
+  //   // candidateFiles,
+  //   setCandidateFiles] = useState<string[]>([]);
+  // const [
+  //   // ttsFiles,
+  //   setTtsFiles] = useState<string[]>([]);
+  const listeningRef = useRef<boolean>(false);
   const recordingRef = useRef<boolean>(false);
   const conversationStartedRef = useRef<boolean>(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -67,6 +72,8 @@ const Home: NextPage = () => {
   const analyserRef = useRef<AnalyserNode | null>(null);
   const silenceTimerRef = useRef<number | null>(null);
   const levelIntervalRef = useRef<number | null>(null);
+  const sttWsRef = useRef<WebSocket | null>(null);
+  const pcmWorkletRef = useRef<AudioWorkletNode | null>(null);
 
   // Refs to store placeholder indices
   const lastUserPlaceholderIndexRef = useRef<number | null>(null);
@@ -82,6 +89,15 @@ const Home: NextPage = () => {
     }
   }, [conversation]);
 
+  useEffect(() => {
+    /* --------------------------------------------------------------- *
+      *  ① open browser → /api/stt WebSocket                            *
+      * --------------------------------------------------------------- */
+    sttWsRef.current = new WebSocket('ws://localhost:4000');
+    sttWsRef.current.binaryType = 'arraybuffer';
+    sttWsRef.current.onclose = stopConversation;
+  }, []);
+
   // Helper: update entire conversation (state & ref)
   const updateConversation = (newConversation: Message[]) => {
     setConversation(newConversation);
@@ -90,9 +106,11 @@ const Home: NextPage = () => {
 
   // Helper: update a specific message by index
   const updateConversationMessage = (index: number, newText: string) => {
+    const skippables = ['AI is typing...', 'Processing your message...'];
     if (index < 0 || index >= conversationRef.current.length) return;
     const updated = [...conversationRef.current];
-    updated[index] = { ...updated[index], text: newText };
+    const processedText = skippables.includes(updated[index].text) ? newText: `${updated[index].text} ${newText}`;
+    updated[index] = { ...updated[index], text: processedText };
     conversationRef.current = updated;
     setConversation(updated);
   };
@@ -102,24 +120,38 @@ const Home: NextPage = () => {
     audio.play().catch(console.error);                  // progressive MP3 :contentReference[oaicite:2]{index=2}
     audio.onended = onEnded;
   };
-  
+
 
   // Start continuous conversation
   const startConversation = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       audioStreamRef.current = stream;
-      const audioContext = new AudioContext();
+      /* 3 — Create an AudioContext explicitly at 24 kHz */
+      const audioContext = new AudioContext({ sampleRate: 24000 });
       audioContextRef.current = audioContext;
+
+      // Prepare the audio stream for processing
       const source = audioContext.createMediaStreamSource(stream);
       const analyser = audioContext.createAnalyser();
       analyser.fftSize = 2048;
       source.connect(analyser);
       analyserRef.current = analyser;
 
+      // Create and attrach worklet processor to pass processed audio for transcription
+      const workletUrl = new URL('/pcm16-worklet.js', window.location.origin).href;
+      await audioContextRef.current.audioWorklet.addModule(workletUrl);
+      const pcmWorklet = new AudioWorkletNode(audioContextRef.current, 'pcm16-processor');
+      pcmWorkletRef.current = pcmWorklet;
+      /* 5 — Connect mic → worklet and start */
+      const src = audioContextRef.current.createMediaStreamSource(stream);
+      src.connect(pcmWorklet);
+      
+
+
       updateConversation([]); // reset conversation
-      setCandidateFiles([]);
-      setTtsFiles([]);
+      // setCandidateFiles([]);
+      // setTtsFiles([]);
       recordingRef.current = true;
       startSegmentRecording();
       levelIntervalRef.current = window.setInterval(monitorAudioLevel, 100);
@@ -132,7 +164,7 @@ const Home: NextPage = () => {
   const stopConversation = () => {
     recordingRef.current = false;
     mediaRecorderRef.current?.stop();
-    setListening(false);
+    listeningRef.current = false;
     if (levelIntervalRef.current) {
       clearInterval(levelIntervalRef.current);
       levelIntervalRef.current = null;
@@ -143,26 +175,63 @@ const Home: NextPage = () => {
     }
     audioStreamRef.current?.getTracks().forEach((track) => track.stop());
     audioContextRef.current?.close();
+    sttWsRef.current?.close();
   };
 
   // Start a new segment recording
   const startSegmentRecording = () => {
     if (!audioStreamRef.current) return;
+    if (!audioContextRef.current) return;
+    if (!pcmWorkletRef.current) return;
     audioChunksRef.current = [];
     const recorder = new MediaRecorder(audioStreamRef.current);
     recorder.ondataavailable = (event) => {
       if (event.data.size > 0) {
         audioChunksRef.current.push(event.data);
       }
-    };
+    };          // MDN﻿③
     recorder.onstop = () => {
-      setListening(false);
+      listeningRef.current = false;
       const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
       processSegment(blob);
     };
     recorder.start();
     mediaRecorderRef.current = recorder;
-    setListening(true);
+    const userPlaceholderIndex = conversationRef.current.length;
+    updateConversation([
+      ...conversationRef.current,
+      { sender: 'user', text: 'Processing your message...' },
+    ]);
+    lastUserPlaceholderIndexRef.current = userPlaceholderIndex;
+    pcmWorkletRef.current.port.onmessage = ({ data }: { data: Uint8Array }) => {
+      // console.log('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!', data)
+      if (
+        listeningRef.current &&
+        conversationStartedRef.current &&
+        sttWsRef.current?.readyState === WebSocket.OPEN
+      ) {
+        sttWsRef.current.send(data);        // raw PCM16 bytes
+      }
+    };
+
+    if (sttWsRef.current) {
+      sttWsRef.current.onmessage = (ev) => {
+        const evt = JSON.parse(ev.data as string);
+        if (evt.type?.endsWith('.delta')) console.log('Δ', evt.delta);
+        if (evt.type?.endsWith('.completed')) {
+          console.log('✔', evt.transcript)
+          // Replace user placeholder with actual transcript
+          if (lastUserPlaceholderIndexRef.current !== null && listeningRef.current) {
+            updateConversationMessage(lastUserPlaceholderIndexRef.current, evt.transcript);
+            // lastUserPlaceholderIndexRef.current = null;
+          }
+        };
+
+      };
+    } else {
+      console.log('Websocket not connected')
+    }
+    listeningRef.current = true;
     console.log('Segment recording started');
   };
 
@@ -203,31 +272,31 @@ const Home: NextPage = () => {
   // Process a recorded segment
   const processSegment = async (segmentBlob: Blob) => {
     // Insert user placeholder before sending to transcribe endpoint
-    const userPlaceholderIndex = conversationRef.current.length;
-    updateConversation([
-      ...conversationRef.current,
-      { sender: 'user', text: 'Processing your message...' },
-    ]);
-    lastUserPlaceholderIndexRef.current = userPlaceholderIndex;
+    // const userPlaceholderIndex = conversationRef.current.length;
+    // updateConversation([
+    //   ...conversationRef.current,
+    //   { sender: 'user', text: 'Processing your message...' },
+    // ]);
+    // lastUserPlaceholderIndexRef.current = userPlaceholderIndex;
 
     const formData = new FormData();
     formData.append('file', segmentBlob, 'segment.webm');
 
     try {
       // Call transcribe endpoint
-      const transcribeRes = await fetch('/api/transcribe', {
-        method: 'POST',
-        body: formData,
-      });
-      const transcribeData = await transcribeRes.json();
-      if (transcribeData.candidateFile) {
-        setCandidateFiles((prev) => [...prev, transcribeData.candidateFile]);
-      }
-      // Replace user placeholder with actual transcript
-      if (transcribeData.transcript && lastUserPlaceholderIndexRef.current !== null) {
-        updateConversationMessage(lastUserPlaceholderIndexRef.current, transcribeData.transcript);
-        lastUserPlaceholderIndexRef.current = null;
-      }
+      // const transcribeRes = await fetch('/api/transcribe', {
+      //   method: 'POST',
+      //   body: formData,
+      // });
+      // const transcribeData = await transcribeRes.json();
+      // if (transcribeData.candidateFile) {
+      //   setCandidateFiles((prev) => [...prev, transcribeData.candidateFile]);
+      // }
+      // // Replace user placeholder with actual transcript
+      // if (transcribeData.transcript && lastUserPlaceholderIndexRef.current !== null) {
+      //   updateConversationMessage(lastUserPlaceholderIndexRef.current, transcribeData.transcript);
+      //   lastUserPlaceholderIndexRef.current = null;
+      // }
       // Insert AI placeholder for chat response
       const aiPlaceholderIndex = conversationRef.current.length;
       updateConversation([
@@ -237,20 +306,27 @@ const Home: NextPage = () => {
       lastAiPlaceholderIndexRef.current = aiPlaceholderIndex;
 
       const assessPayload = {
-        transcript: transcribeData.transcript,
+        transcript: conversationRef.current[lastUserPlaceholderIndexRef.current!].text,
         conversation: conversationRef.current,
       };
       const assessRes = await axios.post('/api/assess', assessPayload, {
         headers: { 'Content-Type': 'application/json' },
       });
       const assessData = assessRes.data;
+      if (assessData.chatResponse) {
+        playStreamingTTS(assessData.chatResponse, () => {
+          if (recordingRef.current) startSegmentRecording();
+        });
+      } else if (recordingRef.current) {
+        startSegmentRecording();
+      }
       if (assessData.chatResponse && lastAiPlaceholderIndexRef.current !== null) {
         updateConversationMessage(lastAiPlaceholderIndexRef.current, assessData.chatResponse);
         lastAiPlaceholderIndexRef.current = null;
       }
-      if (assessData.ttsFile) {
-        setTtsFiles((prev) => [...prev, assessData.ttsFile]);
-      }
+      // if (assessData.ttsFile) {
+      //   setTtsFiles((prev) => [...prev, assessData.ttsFile]);
+      // }
       // Play TTS audio and then start new segment when finished
       // if (assessData.ttsAudio) {
       //   const audio = new Audio(`data:audio/mp3;base64,${assessData.ttsAudio}`);
@@ -261,13 +337,7 @@ const Home: NextPage = () => {
       // } else {
       //   if (recordingRef.current) startSegmentRecording();
       // }
-      if (assessData.chatResponse) {
-        playStreamingTTS(assessData.chatResponse, () => {
-          if (recordingRef.current) startSegmentRecording();
-        });
-      } else if (recordingRef.current) {
-        startSegmentRecording();
-      }
+      
     } catch (error) {
       console.error('Error processing segment:', error);
       if (recordingRef.current) startSegmentRecording();
@@ -275,25 +345,25 @@ const Home: NextPage = () => {
   };
 
   // Stitch conversation segments together
-  const completeConversation = async () => {
-    setUploading(true);
-    try {
-      const res = await fetch('/api/stitch', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          candidateFiles,
-          ttsFiles,
-          name,
-        }),
-      });
-      await res.json();
-    } catch (error) {
-      console.error('Error stitching conversation:', error);
-    } finally {
-      setUploading(false);
-    }
-  };
+  // const completeConversation = async () => {
+  //   setUploading(true);
+  //   try {
+  //     const res = await fetch('/api/stitch', {
+  //       method: 'POST',
+  //       headers: { 'Content-Type': 'application/json' },
+  //       body: JSON.stringify({
+  //         candidateFiles,
+  //         ttsFiles,
+  //         name,
+  //       }),
+  //     });
+  //     await res.json();
+  //   } catch (error) {
+  //     console.error('Error stitching conversation:', error);
+  //   } finally {
+  //     setUploading(false);
+  //   }
+  // };
 
   console.log('name', (name && name.length));
   return (
@@ -344,7 +414,7 @@ const Home: NextPage = () => {
         {uploading && (
           <div className="upload-skeleton">Conversation uploading...</div>
         )}
-        {recordingRef.current && listening && (
+        {recordingRef.current && listeningRef.current && (
           <div className="listening-indicator">
             <div className="wave"></div>
             <div className="wave"></div>
