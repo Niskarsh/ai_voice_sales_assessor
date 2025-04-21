@@ -93,7 +93,9 @@ const Home: NextPage = () => {
     /* --------------------------------------------------------------- *
       *  ① open browser → /api/stt WebSocket                            *
       * --------------------------------------------------------------- */
-    sttWsRef.current = new WebSocket(new URL('/ws', process.env.NEXT_PUBLIC_WEBSOCKET_URL!).toString());
+    console.log('Connecting to STT WebSocket...', process.env.NEXT_PUBLIC_WEBSOCKET_URL);
+    const wsUrl = new URL('/ws', process.env.NEXT_PUBLIC_WEBSOCKET_URL!).toString();
+    sttWsRef.current = new WebSocket(wsUrl);
     sttWsRef.current.binaryType = 'arraybuffer';
     sttWsRef.current.onclose = stopConversation;
   }, []);
