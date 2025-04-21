@@ -2,7 +2,8 @@
 import { useState, useRef, useEffect } from 'react';
 import type { NextPage } from 'next';
 import axios from 'axios';
-
+import dotenv from 'dotenv';
+dotenv.config();
 interface Message {
   sender: 'user' | 'ai';
   text: string;
